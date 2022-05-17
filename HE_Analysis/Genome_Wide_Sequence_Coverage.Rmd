@@ -1,0 +1,203 @@
+---
+title: "Genome_Wide_Sequence_Coverage"
+output: html_document
+date: '2022-05-09'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Software used
+
+Samtools version 1.14
+
+BWA version 0.7.17-r1188
+
+Trimmomatic version 0.33
+
+Bedtools2 verison 2.29.2
+
+JCVI utility libraries version 0.8.12
+
+## Generating the reads for assembly comparisions
+
+1.  Started with 10X reads from DaAe. Removed the 10X barcodes.
+    -   `trimmomatic SE -threads 8 Bnapus1_S1_L001_R1_001.fastq.gz Unbarcoded_Bnapus1_S1_L001_R1_001.fastq.gz HEADCROP:23`
+
+    -   `trimmomatic SE -threads 8 Bnapus1_S1_L001_R2_001.fastq.gz Unbarcoded_Bnapus1_S1_L001_R2_001.fastq.gz HEADCROP:1`
+2.  Mapped the reads to a psuedo napus assembly which was a concatenation of A01-A10 of B.rapa (Brapa_Z1_V2) and C01-C09 of B.oleracea (Boleracea_HDEM)
+    -   `bwa mem -t 20 ../Assemblies/pseudo_napus.fa Unbarcoded_Bnapus1_S1_L001_R1_001.fastq.gz Unbarcoded_Bnapus1_S1_L001_R2_001.fastq.gz > Mapped.sam`
+
+<!-- -->
+
+3.  Filtered out reads with alternative hits
+    -   `samtools view -h Mapped.sam |  grep -v "XA:Z:" > Filtered.Mapped.sam`
+4.  Filtered unpaired reads etc
+    -   `samtools view -@ 20 -h -f 1 -f 2 -F 4 -F 8 -F 256 -F 512 -F 1024 -F 2048 Filtered_Mapped_2.sam`
+5.  Convert to BAM format
+    -   `samtools view -b -@ 20 Filtered.Mapped_2.sam > Filtered.Mapped.bam`
+6.  Sort BAM file
+    -   `samtools sort -n -@ 20 -o Sorted_Filtered.Mapped.bam Filtered.Mapped.bam`
+7.  Fix Mates
+    -   `samtools fixmate -r -@ 20 Sorted_Filtered.Mapped.bam Sorted_Filtered.Mapped_2.bam`
+8.  Filtered unpaired reads etc (Have to fix following mate fixing)
+    -   `samtools view -@ 20 -b -f 1 -f 2 -F 4 -F 8 -F 256 -F 512 -F 1024 -F 2048` `Sorted_Filtered.Mapped_2.bam > Sorted_Filtered.Mapped_3.bam`
+9.  Sort by name to extract read pairs
+    -   `samtools sort -@ 20 -n -o Name_Sorted_Filtered.bam Sorted_Filtered.Mapped_3.bam`
+10. Extract the reads
+    -   `samtools fastq -1 Trusted_1.fq.gz -2 Trusted_2.fq.gz Name_Sorted_Filtered.bam`
+
+## Mapping reads to assemblies
+
+1.  Map reads to respective assembly
+    -   `bwa mem -t 20 Assembly.fa Trusted_1.fq.gz Trusted_2.fq.gz | samtools view -@ 20 -b -o Assembly.bam -`
+
+        `samtools sort -@ 20 -o Sorted_Assembly.bam Assembly.bam`
+2.  Filter to remove low quality alignments
+    -   `samtools view -@ 5 -b -q 5 -F 4 -o Filtered_Sorted_Assembly.bam Sorted_Assembly.bam`
+
+## Creating BED files for coverages
+
+1.  Make bed files for sequence regions
+    -   `samtools faidx Assembly.fa`
+
+    -   `awk '{print $1"\t"$2}' Assembly.fa.fai > Assembly_chrom_lengths.txt`
+
+    -   `bedtools makewindows -g Assembly_chrom_lengths.txt  -w 100000 -s 20000 > Assembly_100kbW_20KbS.bed`
+2.  Make bed files for genes
+    -   `source ~/.bashrc`
+
+    -   `conda activate jcvi_env`
+
+    -   `python -m jcvi.formats.gff bed --type=mRNA --key=Name Assembly.gff3  -o Assembly_Genes.bed`
+
+    -   `grep -v "scaffold[^AC]" Assembly_Genes.bed | grep -v "Random" | grep -c -v "ScsI" > Shortened_Assembly_Genes.bed`
+
+## Obtaining Coverage for regions
+
+1.  By Gene
+    -   `bedtools coverage -a Shortened_Assembly_Genes.bed -b Filtered_Sorted_Assembly.bam > Assembly_Gene.coverage.tsv`
+2.  By Sequence
+    -   `bedtools coverage -a Assembly_100kbW_20KbS.bed -b Filtered_Sorted_Assembly.bam > Assembly.coverage.tsv`
+
+### Format of coverage output
+
+1.  The number of features in B that overlapped (by at least one base pair) the A interval. (READS)
+
+2.  The number of bases in A that had non-zero coverage from features in B. (Bases covered)
+
+3.  The length of the entry in A. (Size of region)
+
+4.  The fraction of bases in A that had non-zero coverage from features in B. (Ratio of covered to no coverage)
+
+### Calculating Coverages for sequences
+
+```{r}
+library(tidyverse)
+library(zoo)
+```
+
+```{r}
+#Assembly list
+Assembly_filenames <- list.files("Coverages/Sequence/")
+Assembly_names <- str_remove(Assembly_filenames, "_coverage.tsv")
+```
+
+```{r}
+# Load coverage
+coverage_columns <- c("Chromosome", "Start", "End", "Reads", "Covered", "Size", "Ratio")
+Coverages <- list()
+for(i in Assembly_names){
+  df <- read_tsv(paste0("Coverages/Sequence/", i, "_coverage.tsv"),
+                          col_names = coverage_columns)
+  df$Chromosome <- str_remove(str_remove(str_remove(df$Chromosome, "chr"), "scaffold"), ".*_")
+  df <- df %>% arrange(Chromosome,Start)
+  df$Assembly <- i
+  df <- df %>% select(Assembly, everything())
+  Coverages[[i]] <- df
+}
+Coverages$Boleracea$Chromosome <- str_replace(Coverages$Boleracea$Chromosome, "C", "C0" )
+```
+
+```{r}
+#Check Chromosome Names
+for(i in 1:length(Coverages)){
+  print(unique(Coverages[[i]][2]))
+}
+```
+
+```{r}
+# Combine into master data frame
+master.df <- do.call("rbind", Coverages)
+rownames(master.df) <- NULL
+master.df <- master.df %>% arrange(Chromosome, Start, Assembly)
+```
+
+```{r}
+# Make some calculations
+master.df <- master.df %>%
+  group_by(Assembly, Chromosome) %>%
+  mutate(Average_Chromosome_Coverage = mean(Reads, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(Coverage_Ratio = round(Reads/Average_Chromosome_Coverage, 2))
+  
+```
+
+```{r}
+# Make test plot for A01
+A01 <- master.df %>%
+  filter(Assembly != "Boleracea", Chromosome == "A01")
+  #mutate(Coverage_Ratio = ifelse(Coverage_Ratio >= 5, 5, Coverage_Ratio)) %>%
+  #group_by(Assembly) %>%
+  #mutate(sd.Coverage_Ratio = scale(Coverage_Ratio)) %>%
+  #ungroup()
+
+ggplot(A01, aes(x = End, y = Coverage_Ratio, color = Assembly)) +
+  geom_smooth()
+ggplot(A01, aes(x = End, y = Coverage_Ratio, color = Assembly)) +
+  geom_point()
+```
+
+```{r}
+A01 <- A01 %>%
+  group_by(Assembly) %>%
+  mutate(MbWindow_Average_Ratio = rollmean(Coverage_Ratio, k = 10, fill = NA)) %>%
+  filter(End %% 1000000 == 0, ) %>%
+  mutate(MbWindow.sd.Coverage_Ratio = scale(MbWindow_Average_Ratio)) %>%
+  ungroup()
+
+ggplot(A01, aes(x = End, y = MbWindow.sd.Coverage_Ratio, color = Assembly)) +
+  geom_line()
+ggplot(A01, aes(x = End, y = MbWindow.sd.Coverage_Ratio, color = Assembly)) +
+  geom_point()
+```
+
+```{r}
+# Make test plot for A01
+A03 <- master.df %>%
+  filter(Assembly != "Boleracea", Chromosome == "A03") %>%
+  mutate(Coverage_Ratio = ifelse(Coverage_Ratio >= 5, 5, Coverage_Ratio)) %>%
+  group_by(Assembly) %>%
+  mutate(sd.Coverage_Ratio = scale(Coverage_Ratio)) %>%
+  ungroup()
+
+ggplot(A03, aes(x = End, y = sd.Coverage_Ratio, color = Assembly)) +
+  geom_smooth()
+ggplot(A03, aes(x = End, y = sd.Coverage_Ratio, color = Assembly)) +
+  geom_point()
+```
+
+```{r}
+A03 <- A03 %>%
+  group_by(Assembly) %>%
+  mutate(MbWindow_Average_Ratio = rollmean(Coverage_Ratio, k = 10, fill = NA)) %>%
+  filter(End %% 1000000 == 0, ) %>%
+  mutate(MbWindow.sd.Coverage_Ratio = scale(MbWindow_Average_Ratio)) %>%
+  ungroup()
+
+ggplot(A03, aes(x = End, y = MbWindow.sd.Coverage_Ratio, color = Assembly)) +
+  geom_smooth()
+ggplot(A03, aes(x = End, y = MbWindow.sd.Coverage_Ratio, color = Assembly)) +
+  geom_point()
+```
