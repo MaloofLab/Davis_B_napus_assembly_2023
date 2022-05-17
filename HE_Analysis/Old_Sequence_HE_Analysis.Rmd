@@ -1,0 +1,256 @@
+---
+title: "Sequence_HE_Analysis"
+author: "John D."
+date: "2/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Look at coverage across genomes
+
+```{r}
+## Read in the calculated coverages
+progenitor_coverage_readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = c("chromosome","start","end","coverage"),
+                   delim = "\t") %>%
+    mutate(coverage = round(coverage / (end - start),2),
+           position = floor((end + start)/2)) %>%
+    group_by(chromosome) %>%
+    mutate(chromosome_average = mean(coverage, na.rm = T),
+           chromosome_sd = sd(coverage),
+           chromosome_average = mean(coverage),
+           chromosome_sd = sd(coverage),
+           relative_coverage = round(coverage / chromosome_average, 2),
+           relative_coverage = ifelse(relative_coverage >= 10, NA, relative_coverage),
+           std_relative_coverage = scale(relative_coverage)) %>%
+    ungroup()
+  return(df)
+}
+
+coverage_readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = c("chromosome","start","end","coverage_primary", "coverage_alt"),
+                   delim = "\t") %>%
+    mutate(coverage = coverage_primary + coverage_alt) %>%
+    select(-coverage_primary, -coverage_alt) %>%
+    mutate(coverage = round(coverage / (end - start),2),
+           position = floor((end + start)/2)) %>%
+    group_by(chromosome) %>%
+    mutate(chromosome_average = mean(coverage, na.rm = T),
+           chromosome_sd = sd(coverage),
+           chromosome_average = mean(coverage),
+           chromosome_sd = sd(coverage),
+           relative_coverage = round(coverage / chromosome_average, 2),
+           relative_coverage = ifelse(relative_coverage >= 10, NA, relative_coverage),
+           std_relative_coverage = scale(relative_coverage)) %>%
+    ungroup()
+  return(df)
+}
+
+Progenitor_DaAe_Coverage <- progenitor_coverage_readin("Coverages/Progenitor_DaAe_coverage.tsv")
+DaAe_Coverage <- coverage_readin("Coverages/DaAe_Genome_coverage.tsv")
+Progenitor_Reference_Coverage <- progenitor_coverage_readin("Coverages/Progenitor_Darmor_coverage.tsv")
+Reference_Coverage <- coverage_readin("Coverages/Darmor_Genome_coverage.tsv")
+Progenitor_Tapidor_Coverage <- progenitor_coverage_readin("Coverages/Progenitor_Tapidor_coverage.tsv")
+Tapidor_Coverage <- coverage_readin("Coverages/Tapidor_Genome_coverage.tsv")
+```
+
+# Format the data a bit
+
+```{r}
+Progenitor_DaAe_Coverage <- Progenitor_DaAe_Coverage %>%
+  mutate(assembly = "DaAe",
+         chromosome = paste0("chr",chromosome))
+Progenitor_Reference_Coverage <- Progenitor_Reference_Coverage %>%
+  mutate(assembly = "Reference",
+         chromosome = paste0("chr",chromosome))
+Progenitor_Tapidor_Coverage <- Progenitor_Tapidor_Coverage %>%
+  mutate(assembly = "Tapidor",
+         chromosome = paste0("chr",chromosome))
+DaAe_Coverage$assembly <- "DaAe"
+Reference_Coverage$assembly <- "Reference"
+Tapidor_Coverage <- Tapidor_Coverage %>%
+  mutate(assembly = "Tapidor",
+         chromosome = sub("Tapidor_","",sub("_v6.3","",chromosome)))
+
+All_Coverage <- rbind(Progenitor_DaAe_Coverage, Progenitor_Reference_Coverage, Progenitor_Tapidor_Coverage,
+                      DaAe_Coverage, Reference_Coverage, Tapidor_Coverage)
+All_Progenitor <- rbind(Progenitor_DaAe_Coverage,Progenitor_Reference_Coverage,Progenitor_Tapidor_Coverage)
+All_Napus <- rbind(DaAe_Coverage,Reference_Coverage,Tapidor_Coverage)
+Combined_DaAe <- rbind(Progenitor_DaAe_Coverage, DaAe_Coverage)
+Combined_Reference <- rbind(Progenitor_Reference_Coverage, Reference_Coverage)
+Combined_Tapidor <- rbind(Progenitor_Tapidor_Coverage, Tapidor_Coverage)
+```
+
+## Clustering a bit
+
+```{r}
+# Set the value of each point equal to most frequent rounded value in 20 neighbors will have to burn in 10
+Clustered_Progenitor_DaAe_Coverage <- Progenitor_DaAe_Coverage %>%
+  mutate(consensus = NA)
+Clustered_Progenitor_Reference_Coverage <- Progenitor_Reference_Coverage %>%
+  mutate(consensus = NA)
+Clustered_Progenitor_Tapidor_Coverage <- Progenitor_Tapidor_Coverage %>%
+  mutate(consensus = NA)
+
+for(i in 11:(nrow(Clustered_Progenitor_DaAe_Coverage)-10)){
+  neighbors <- round(Clustered_Progenitor_DaAe_Coverage$std_relative_coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  winner <- median(neighbors, na.rm = T)
+  if(is_empty(winner)) winner <- Clustered_Progenitor_DaAe_Coverage$consensus[i-1]
+  Clustered_Progenitor_DaAe_Coverage$consensus[i] <- round(mean(winner),1)
+}
+for(i in 11:(nrow(Clustered_Progenitor_Reference_Coverage)-10)){
+  neighbors <- round(Clustered_Progenitor_Reference_Coverage$std_relative_coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  winner <- median(neighbors, na.rm = T)
+  if(is_empty(winner)) winner <- Clustered_Progenitor_Reference_Coverage$consensus[i-1]
+  Clustered_Progenitor_Reference_Coverage$consensus[i] <- round(mean(winner),1)
+}
+for(i in 11:(nrow(Clustered_Progenitor_Tapidor_Coverage)-10)){
+  neighbors <- round(Clustered_Progenitor_Tapidor_Coverage$std_relative_coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  winner <- median(neighbors, na.rm = T)
+  if(is_empty(winner)) winner <- Clustered_Progenitor_Tapidor_Coverage$consensus[i-1]
+  Clustered_Progenitor_Tapidor_Coverage$consensus[i] <- round(mean(winner),1)
+}
+
+# Factor in Napus
+
+Clustered_DaAe_Coverage <- DaAe_Coverage %>%
+  mutate(consensus = NA)
+Clustered_Reference_Coverage <- Reference_Coverage %>%
+  mutate(consensus = NA)
+Clustered_Tapidor_Coverage <- Tapidor_Coverage %>%
+  mutate(consensus = NA)
+
+for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
+  neighbors <- round(Clustered_DaAe_Coverage$std_relative_coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  winner <- median(neighbors, na.rm = T)
+  if(is_empty(winner)) winner <- Clustered_DaAe_Coverage$consensus[i-1]
+  Clustered_DaAe_Coverage$consensus[i] <- round(mean(winner),1)
+}
+for(i in 11:(nrow(Clustered_Reference_Coverage)-10)){
+  neighbors <- round(Clustered_Reference_Coverage$std_relative_coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  winner <- median(neighbors, na.rm = T)
+  if(is_empty(winner)) winner <- Clustered_Reference_Coverage$consensus[i-1]
+  Clustered_Reference_Coverage$consensus[i] <- round(mean(winner),1)
+}
+for(i in 11:(nrow(Clustered_Tapidor_Coverage)-10)){
+  neighbors <- round(Clustered_Tapidor_Coverage$std_relative_coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  winner <- median(neighbors, na.rm = T)
+  if(is_empty(winner)) winner <- Clustered_Tapidor_Coverage$consensus[i-1]
+  Clustered_Tapidor_Coverage$consensus[i] <- round(mean(winner),1)
+}
+
+Clustered_All_Progenitor <- rbind(Clustered_Progenitor_DaAe_Coverage,
+                                  Clustered_Progenitor_Reference_Coverage,
+                                  Clustered_Progenitor_Tapidor_Coverage)
+
+Clustered_All_Napus <- rbind(Clustered_DaAe_Coverage,
+                                  Clustered_Reference_Coverage,
+                                  Clustered_Tapidor_Coverage)
+
+
+Clustered_All_Progenitor <- Clustered_All_Progenitor %>%
+  mutate(read_source = assembly,
+         assembly = "Progenitor")
+
+Clustered_All_Napus <- Clustered_All_Napus %>%
+  mutate(read_source = assembly)
+
+Clustered_All <- rbind(Clustered_All_Progenitor, Clustered_All_Napus) %>%
+  mutate(assembly = factor(assembly, levels = c("Progenitor","DaAe","Darmor-bzh","Tapidor")))
+
+```
+
+### Tweak Plots to Julin's suggestions
+
+```{r}
+load("Gene_Positions.RData")
+name_fix <- function(positions, assembly_name = "", doubled = "A"){
+  df <- positions %>%
+    mutate(chromosome = sub("chr", "", chromosome),
+           chromosome = paste0("chr",chromosome),
+           y = ifelse(grepl(doubled,chromosome), 3.5, -3.5),
+           shaped = ifelse(y == 3.5, "<", ">"),
+           Assembly = ifelse(Assembly == "Napus", assembly_name, Assembly),
+           read_source = assembly_name) %>%
+    select(chromosome, position, y, `Mapped to` = Assembly, `Read source` = read_source, shaped)
+  return(df)
+}
+
+DA_DaAe_Positions <- name_fix(DA_DaAe_Positions, "DaAe", "A")
+DA_Reference_Positions <- name_fix(DA_Reference_Positions, "Reference", "A")
+DA_Tapidor_Positions <- name_fix(DA_Tapidor_Positions, "Tapidor", "A") %>%
+  mutate(chromosome = sub("Tapidor_","",sub("_v6.3","",chromosome)))
+DC_DaAe_Positions <- name_fix(DC_DaAe_Positions, "DaAe", "C")
+DC_Reference_Positions <- name_fix(DC_Reference_Positions, "Reference", "C")
+DC_Tapidor_Positions <- name_fix(DC_Tapidor_Positions, "Tapidor", "C") %>%
+  mutate(chromosome = sub("Tapidor_","",sub("_v6.3","",chromosome)))
+
+All_Positions <- rbind(DA_DaAe_Positions, DA_Reference_Positions, DA_Tapidor_Positions,
+                       DC_DaAe_Positions, DC_Reference_Positions, DC_Tapidor_Positions)
+
+All_Positions <- All_Positions %>%
+  mutate(`Mapped to` = ifelse(`Mapped to` == "Reference", "Darmor-bzh", `Mapped to`),
+         `Mapped to` = ifelse(`Mapped to` == "Progenitor", "_In silico", `Mapped to`),
+         `Read source` = ifelse(`Read source` == "Reference", "Darmor-bzh", `Read source`)
+  )
+
+Clustered_All <- rbind(Clustered_All_Progenitor, Clustered_All_Napus) %>%
+  mutate(assembly = ifelse(assembly == "Reference", "Darmor-bzh", assembly),
+         assembly = ifelse(assembly == "Progenitor", "_In silico", assembly),
+         read_source = ifelse(read_source == "Reference", "Darmor-bzh", read_source),
+         assembly = factor(assembly, levels = c("DaAe","Darmor-bzh","_In silico","Tapidor")
+  ))
+
+colnames(Clustered_All)
+colnames(Clustered_All)[c(10,12)] <- c("Mapped to", "Read source")
+
+chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
+for (i in chroms) {
+  Clustered_All %>% filter(chromosome == i) %>%
+    mutate(consensus = ifelse(consensus >= 4,
+                                          4,
+                                          ifelse(consensus <= -4,
+                                                 -4,
+                                                 consensus))) %>%
+    ggplot(aes(x = position, y = consensus)) +
+    geom_point(aes(colour = cut(consensus, c(-Inf, -1, 1, Inf)))) +
+    scale_color_manual(name = "consensus",
+                     values = c("(-Inf,-1]" = "red",
+                                  "(-1,1]" = "black",
+                                  "(1, Inf]" = "blue"),
+                     labels = c("<= -1", "-1 < consensus <= 1", "> 1")) +
+    ggtitle(i) +
+    geom_hline(yintercept = 1, color="black") +
+    geom_hline(yintercept = 0, color="black") +
+    geom_hline(yintercept = -1, color="black") +
+    facet_wrap(`Read source`~`Mapped to`,
+               ncol = 2,
+               labeller = function (labels) {
+                 labels <- lapply(labels, as.character)
+                 labels[[1]] <- paste("Read source:", labels[[1]])
+                 labels[[2]] <- paste("Mapped to:", labels[[2]])
+                 a <-  do.call(paste,c(labels, list(sep = "\n")))
+                 list(gsub("_","",a))
+                 }) +
+    geom_text(data = All_Positions %>% filter(chromosome == i),
+               aes(x = position, y = y, label = shaped))
+  ggsave(paste0("Coverage_Plots_02242021/",i,".png"), width = 10, height = 10)
+}
+
+save(Clustered_All, file = "coverages.RData")
+```

@@ -44,10 +44,12 @@ Boleracea_vs_Brapa <- read_table("BlastP/Boleracea_HDEM_vs_Brapa_Z1_V2.out.gz", 
 # Filter for best hits
 Brapa_vs_Boleracea <- Brapa_vs_Boleracea %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 Boleracea_vs_Brapa <- Boleracea_vs_Brapa %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 
 # Merge together
 Brapa_and_Boleracea <- inner_join(Brapa_vs_Boleracea,
@@ -67,10 +69,12 @@ DaAe_A_vs_Brapa <- DaAe_vs_Brapa %>%
 # Filter for best hits
 Brapa_vs_DaAe_A <- Brapa_vs_DaAe_A %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 DaAe_A_vs_Brapa <- DaAe_A_vs_Brapa %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 
 # Merge together
 Brapa_and_DaAe_A <- inner_join(Brapa_vs_DaAe_A,
@@ -88,10 +92,12 @@ DaAe_C_vs_Brapa <- DaAe_vs_Brapa %>%
 # Filter for best hits
 Brapa_vs_DaAe_C <- Brapa_vs_DaAe_C %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 DaAe_C_vs_Brapa <- DaAe_C_vs_Brapa %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 
 # Merge together
 Brapa_and_DaAe_C <- inner_join(Brapa_vs_DaAe_C,
@@ -111,10 +117,12 @@ DaAe_A_vs_Boleracea <- DaAe_vs_Boleracea %>%
 # Filter for best hits
 Boleracea_vs_DaAe_A <- Boleracea_vs_DaAe_A %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 DaAe_A_vs_Boleracea <- DaAe_A_vs_Boleracea %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 
 # Merge together
 Boleracea_and_DaAe_A <- inner_join(Boleracea_vs_DaAe_A,
@@ -132,10 +140,12 @@ DaAe_C_vs_Boleracea <- DaAe_vs_Boleracea %>%
 # Filter for best hits
 Boleracea_vs_DaAe_C <- Boleracea_vs_DaAe_C %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 DaAe_C_vs_Boleracea <- DaAe_C_vs_Boleracea %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 
 # Merge together
 Boleracea_and_DaAe_C <- inner_join(Boleracea_vs_DaAe_C,
@@ -151,10 +161,12 @@ DaAe_C_vs_DaAe_A <- read_table("BlastP/DaAe_C_vs_DaAe_A.out.gz", col_names = hea
 # Filter for best hits
 DaAe_A_vs_DaAe_C <- DaAe_A_vs_DaAe_C %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 DaAe_C_vs_DaAe_A <- DaAe_C_vs_DaAe_A %>%
   group_by(query.acc.ver) %>%
-  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
 
 # Merge together
 DaAe_A_and_DaAe_C <- inner_join(DaAe_A_vs_DaAe_C,
@@ -163,3 +175,249 @@ DaAe_A_and_DaAe_C <- inner_join(DaAe_A_vs_DaAe_C,
                                          "subject.acc.ver" = "query.acc.ver"))
 ```
 
+For simplicity of the analysis, orthogonal genes between B.rapa and B.oleracea were used to filter potential sites of homeologous exchange between DaAe's two subgenomes, A and C. Homeologous exchange is the exchange of genetic material from one subgenome to the other. In this case it would be the conversion of an A subgenome gene to a C subgenome gene or vice versa. Brassica napus is an allo-tetraploid containing two diploid subgenomes A and C, meaning homeologous exchange can result in homeologous gene ratios of 2:2, 3:1, and 4:0 corresponding to a reciprocal, partial, or complete gene transversion. Because the present assembly is unphased, attempting to identify potential 3:1 homeologous gene ratios is inhibited by the assembler program either selecting one of the two homeologous genes or creating a mashup of the two genes when creating the consensus sequence. In both cases, the true underlying biology is not being accurately represented in the assembly sequence. For this reason, complete gene transversions were the group of focus in this homeologous analysis.
+
+## Find potential sites where a C gene in the C subgenome was converted to an A gene
+
+For a potential homeologous gene pair to be considered as a possible site of homeologous exchange, two requirements must be met. First, the gene must align better to its homeolog than it does to its ortholog. Second, the gene must also align better to its homeolog's ortholog than it does to its ortholog. If an annotation is incomplete or erroneous, it can create both false positive and false negative results.
+
+Compare alignments
+If HE both true:
+  Rule 1: An-Cn > Co-Cn
+  Rule 2: Ar-Cn > Co-Cn
+  
+```{r}
+HE_of_A <- function(ArCo, ArAn, ArCn, CoCn, AnCn, name){
+  # Filter
+  Filtered_ArAn <- ArAn %>%
+    filter(subject.acc.ver %in% ArCo$subject.acc.ver)
+  Filtered_AnCn <- AnCn %>%
+    filter(subject.acc.ver %in% Filtered_ArAn$query.acc.ver)
+
+  # Smaller data frames
+  Small_AnCn <- Filtered_AnCn %>%
+    mutate(pct.identity = (pct.identity.x + pct.identity.y)/2,
+           alignment.length = (alignment.length.x + alignment.length.y)/2,
+           bit.score = (bit.score.x + bit.score.y) / 2,) %>%
+    select(query.acc.ver, subject.acc.ver,
+           pct.identity,
+           alignment.length,
+           bit.score)
+  Small_CoCn <- CoCn %>%
+    mutate(pct.identity = (pct.identity.x + pct.identity.y)/2,
+           alignment.length = (alignment.length.x + alignment.length.y)/2,
+           bit.score = (bit.score.x + bit.score.y) / 2,) %>%
+    select(query.acc.ver, subject.acc.ver,
+           pct.identity,
+           alignment.length,
+           bit.score)
+  Small_ArCn <- ArCn %>%
+    mutate(pct.identity = (pct.identity.x + pct.identity.y)/2,
+           alignment.length = (alignment.length.x + alignment.length.y)/2,
+           bit.score = (bit.score.x + bit.score.y) / 2,) %>%
+    select(query.acc.ver, subject.acc.ver,
+           pct.identity,
+           alignment.length,
+           bit.score)
+  
+  # Rule 1 genes An-Cn > Co-Cn
+  Passed_Rule_1 <- Small_AnCn %>%
+    left_join(Small_CoCn, by = c("query.acc.ver" = "query.acc.ver"), suffix = c(paste0("_", name) ,"_Oleracea")) %>%
+    filter(get(paste0("bit.score_", name)) > bit.score_Oleracea)
+  
+  # Rule 2 genes Ar-Cn > Co-Cn
+  Passed_Rule_2 <- Small_ArCn %>%
+    left_join(Small_CoCn, by = c("query.acc.ver" = "query.acc.ver"), suffix = c("_Rapa","_Oleracea")) %>%
+    filter(bit.score_Rapa > bit.score_Oleracea)
+  
+  # Combine rules
+  Small_Rule_1 <- Passed_Rule_1 %>%
+    select(query.acc.ver, subject.acc.ver = paste0("subject.acc.ver_", name))
+  Small_Rule_2 <- Passed_Rule_2 %>%
+    select(query.acc.ver, subject.acc.ver = subject.acc.ver_Rapa)
+  Combined_Rules <- Small_Rule_1 %>%
+    filter(query.acc.ver %in% Small_Rule_2$query.acc.ver)
+  Possible_Double_A <- Combined_Rules %>%
+    left_join(Filtered_AnCn)
+  
+  return(Possible_Double_A)
+}
+
+DaAe_Double_A <- HE_of_A(ArCo = Brapa_and_Boleracea,
+                         ArAn = Brapa_and_DaAe_A,
+                         ArCn = Brapa_and_DaAe_C,
+                         CoCn = Boleracea_and_DaAe_C,
+                         AnCn = DaAe_A_and_DaAe_C,
+                         name = "DaAe")
+```
+
+## Find potential sites where an A gene in the A subgenome was converted to a C gene
+
+
+Compare alignments
+If HE both true:
+  Rule 1: An-Cn > Ar-An
+  Rule 2: Co-An > Ar-An
+
+```{r}
+HE_of_C <- function(ArCo, ArAn, CoAn, CoCn, AnCn, name){
+  # Filter
+  Filtered_CoCn <- CoCn %>%
+    filter(subject.acc.ver %in% ArCo$query.acc.ver)
+  Filtered_AnCn <- AnCn %>%
+    filter(query.acc.ver %in% Filtered_CoCn$query.acc.ver)
+
+  # Smaller data frames
+  Small_AnCn <- Filtered_AnCn %>%
+    mutate(pct.identity = (pct.identity.x + pct.identity.y)/2,
+           alignment.length = (alignment.length.x + alignment.length.y)/2,
+           bit.score = (bit.score.x + bit.score.y) / 2,) %>%
+    select(query.acc.ver, subject.acc.ver,
+           pct.identity,
+           alignment.length,
+           bit.score)
+  Small_ArAn <- ArAn %>%
+    mutate(pct.identity = (pct.identity.x + pct.identity.y)/2,
+           alignment.length = (alignment.length.x + alignment.length.y)/2,
+           bit.score = (bit.score.x + bit.score.y) / 2,) %>%
+    select(query.acc.ver, subject.acc.ver,
+           pct.identity,
+           alignment.length,
+           bit.score)
+  Small_CoAn <- CoAn %>%
+    mutate(pct.identity = (pct.identity.x + pct.identity.y)/2,
+           alignment.length = (alignment.length.x + alignment.length.y)/2,
+           bit.score = (bit.score.x + bit.score.y) / 2,) %>%
+    select(query.acc.ver, subject.acc.ver,
+           pct.identity,
+           alignment.length,
+           bit.score)
+  
+  # Rule 1 genes An-Cn > Co-Cn
+  Passed_Rule_1 <- Small_AnCn %>%
+    left_join(Small_ArAn, by = c("subject.acc.ver" = "query.acc.ver"), suffix = c(paste0("_", name) ,"_Rapa")) %>%
+    filter(get(paste0("bit.score_", name)) > bit.score_Rapa)
+  
+  # Rule 2 genes Ar-Cn > Co-Cn
+  Passed_Rule_2 <- Small_CoAn %>%
+    left_join(Small_ArAn, by = c("query.acc.ver" = "query.acc.ver"), suffix = c("_Oleracea","_Rapa")) %>%
+    filter(bit.score_Oleracea > bit.score_Rapa)
+  
+  # Combine rules
+  Small_Rule_1 <- Passed_Rule_1 %>%
+    select(query.acc.ver, subject.acc.ver)
+  Small_Rule_2 <- Passed_Rule_2 %>%
+    select(query.acc.ver, subject.acc.ver = subject.acc.ver_Oleracea)
+  Combined_Rules <- Small_Rule_1 %>%
+    filter(subject.acc.ver %in% Small_Rule_2$query.acc.ver)
+  Possible_Double_C <- Combined_Rules %>%
+    left_join(Filtered_AnCn)
+  
+  return(Possible_Double_C)
+}
+
+DaAe_Double_C <- HE_of_C(ArCo = Brapa_and_Boleracea,
+                         ArAn = Brapa_and_DaAe_A,
+                         CoAn = Boleracea_and_DaAe_A,
+                         CoCn = Boleracea_and_DaAe_C,
+                         AnCn = DaAe_A_and_DaAe_C,
+                         name = "DaAe")
+```
+
+
+## Looking at coverage of genes in BED files
+
+To look at the coverage of the genes listed in the BED files, the trimmed 10X reads were mapped to a combined progenitor genome containing A01-A10 from B.rapa and C01-C09 from B.oleracea using BWA. To look at possible sites of homeologous exchange, a subsample of reads with unique trustworthy mapping locations was desired. These were reads which could realiably be described as coming from either the A or C subgenome. Alignments were filtered to only contain reads which had a MAPQ of 5 or greater, were properly paired, had no supplementary alignments, and were primary alignments. This subsample of reads was then mapped to the DaAe assembly and filtered for alignments with a MAPQ of 5 or greater. The two alignment files, filtered progenitor and DaAe, were then used to calculate the coverage of their potential homeologous genes using bedtools coverage and the previously created BED files.
+
+```{r}
+## Length of gene was also factored into coverage estimates
+## For simplicity, the coverage of all genes was calculated then subset for the potential HE genes
+## Starting with the coverage of the progenitor genes
+
+## Read in the calculated coverages
+Coverage_Readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = c("Chromosome","Start","End","GeneId","Score","Strand","Coverage", "Covered", "Size", "Ratio"),
+                   delim = "\t") %>%
+    mutate(Adjusted_Coverage = round(Coverage / Size, 2),
+           Position = floor((End + Start) / 2)) %>%
+    group_by(Chromosome) %>%
+    mutate(Chromosome_Average = mean(Coverage),
+           Chromosome_SD = sd(Coverage),
+           Adjusted_Chromosome_Average = mean(Adjusted_Coverage),
+           Adjusted_Chromosome_SD = sd(Adjusted_Coverage)) %>%
+    ungroup()
+  return(df)
+}
+
+
+Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
+DaAe_Coverage <- Coverage_Readin("Coverages/Gene/DaAe_Gene_coverage.tsv")
+```
+
+# Double A in Progenitor genes
+
+```{r}
+DA_Pseudo_napus_Formatter <- function(ArCo,
+                                      Pseudo_napus_Coverage,
+                                      ArAn,
+                                      Double_A,
+                                      cutoff = 2.5){
+  df <- ArAn %>%
+    filter(query.acc.ver %in% Double_A$subject.acc.ver) %>%
+    select(subject.acc.ver) %>%
+    inner_join(ArCo, by = "subject.acc.ver") %>%
+    select(query.acc.ver, subject.acc.ver) %>%
+    mutate(subject.acc.ver = str_remove(subject.acc.ver, "Parent=")) %>%
+    left_join(Pseudo_napus_Coverage %>%
+                select(GeneId, Adjusted_Coverage), by = c("subject.acc.ver" = "GeneId")) %>%
+    select(Rapa = subject.acc.ver, Oleracea = query.acc.ver, Rapa_coverage = Adjusted_Coverage) %>%
+    left_join(Pseudo_napus_Coverage %>%
+                select(GeneId, Adjusted_Coverage), by = c("Oleracea" = "GeneId")) %>%
+    select(Rapa, Oleracea, Rapa_coverage, Oleracea_coverage = Adjusted_Coverage) %>%
+    filter(Rapa_coverage > 0 & Rapa_coverage > cutoff*Oleracea_coverage) %>%
+    mutate(Ratio = round(Rapa_coverage/Oleracea_coverage,2)) %>%
+    arrange(Rapa)
+  return(df)
+}
+
+DA_Pseudo_napus_DaAe <- DA_Pseudo_napus_Formatter(Brapa_and_Boleracea,
+                                      Pseudo_napus_Coverage,
+                                      Brapa_and_DaAe_A,
+                                      DaAe_Double_A,
+                                      cutoff = 2.5)
+
+```
+
+# Double C in Progenitor genes
+
+```{r}
+DC_Pseudo_napus_Formatter <- function(ArCo,
+                                    Pseudo_napus_Coverage,
+                                    CoCn,
+                                    Double_C,
+                                    cutoff = 2.5){
+  df <- Query_Alignment %>%
+    filter(query.acc.ver %in% Double_C$query.acc.ver) %>%
+    select(subject.acc.ver) %>%
+    inner_join(Progenitor_Alignment, by = c("subject.acc.ver" = "query.acc.ver")) %>%
+    select(qseqid = qseqid.y, sseqid = qseqid) %>%
+    left_join(Progenitor_Genes %>%
+                select(geneid, adjusted_coverage), by = c("qseqid" = "geneid")) %>%
+    select(Rapa = qseqid, Oleracea = sseqid, Rapa_coverage = adjusted_coverage) %>%
+    left_join(Progenitor_Genes %>%
+                select(geneid, adjusted_coverage), by = c("Oleracea" = "geneid")) %>%
+    select(Rapa, Oleracea, Rapa_coverage, Oleracea_coverage = adjusted_coverage) %>%
+    filter(Oleracea_coverage > 0 & Oleracea_coverage > cutoff*Rapa_coverage) %>%
+    mutate(Ratio = round(Oleracea_coverage/Rapa_coverage,2)) %>%
+    arrange(Rapa)
+  return(df)
+}
+
+DC_Pseudo_napus_DaAe <- DC_Pseudo_napus_Formatter(Brapa_and_Boleracea,
+                                                  Pseudo_napus_Coverage,
+                                                  Boleracea_and_DaAe_C,
+                                                  DaAe_Double_C,
+                                                  cutoff = 2.5)
+
+```
