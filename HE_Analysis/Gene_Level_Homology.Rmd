@@ -1,0 +1,165 @@
+---
+title: "Gene Level Homology"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{bash, eval = F}
+# blast/2.12.0+
+blastp \
+ -db ../Sequences/${Seq_1} \
+ -query ../Sequences/${Seq_2} \
+ -max_target_seqs 5 \
+ -out ${Name_1}_vs_${Name_2}.out \
+ -evalue 1e-5 \
+ -num_threads 4 \
+ -outfmt "6 std qlen slen"
+
+blastp \
+ -db ../Sequences/${Seq_2} \
+ -query ../Sequences/${Seq_1} \
+ -max_target_seqs 5 \
+ -out ${Name_2}_vs_${Name_1}.out \
+ -evalue 1e-5 \
+ -num_threads 4 \
+ -outfmt "6 std qlen slen"
+```
+
+### Comparing the ancestral B.rapa and B.oleracea to DaAe
+
+```{r}
+library(tidyverse)
+headers <- c("query.acc.ver","subject.acc.ver","pct.identity","alignment.length","mismatches","gap.opens","q.start","q.end","s.start","s.end","evalue","bit.score","query.length","subject.length")
+```
+
+```{r}
+# Finding the RBH between each genome/subgenome
+# Find the RBH between B.rapa and B.oleracea
+Brapa_vs_Boleracea <- read_table("BlastP/Brapa_Z1_V2_vs_Boleracea_HDEM.out.gz", col_names = headers)
+Boleracea_vs_Brapa <- read_table("BlastP/Boleracea_HDEM_vs_Brapa_Z1_V2.out.gz", col_names = headers)
+
+# Filter for best hits
+Brapa_vs_Boleracea <- Brapa_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+Boleracea_vs_Brapa <- Boleracea_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+
+# Merge together
+Brapa_and_Boleracea <- inner_join(Brapa_vs_Boleracea,
+                                  Boleracea_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for DaAe_A and Brapa
+# Find the RBH between DaAe_A and Brapa
+Brapa_vs_DaAe <- read_table("BlastP/Brapa_Z1_V2_vs_DaAe.out.gz", col_names = headers) %>% filter(!grepl("_Random_", query.acc.ver))
+Brapa_vs_DaAe_A <- Brapa_vs_DaAe %>%
+  filter(grepl("BnachrA",query.acc.ver))
+DaAe_vs_Brapa <- read_table("BlastP/DaAe_vs_Brapa_Z1_V2.out.gz", col_names = headers) %>% filter(!grepl("_Random_", subject.acc.ver))
+DaAe_A_vs_Brapa <- DaAe_vs_Brapa %>%
+  filter(grepl("BnachrA",subject.acc.ver))
+
+# Filter for best hits
+Brapa_vs_DaAe_A <- Brapa_vs_DaAe_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+DaAe_A_vs_Brapa <- DaAe_A_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+
+# Merge together
+Brapa_and_DaAe_A <- inner_join(Brapa_vs_DaAe_A,
+                                  DaAe_A_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for DaAe_C and Brapa
+# Find the RBH between DaAe_C and Brapa
+Brapa_vs_DaAe_C <- Brapa_vs_DaAe %>%
+  filter(grepl("BnachrC",query.acc.ver))
+DaAe_C_vs_Brapa <- DaAe_vs_Brapa %>%
+  filter(grepl("BnachrC",subject.acc.ver))
+
+# Filter for best hits
+Brapa_vs_DaAe_C <- Brapa_vs_DaAe_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+DaAe_C_vs_Brapa <- DaAe_C_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+
+# Merge together
+Brapa_and_DaAe_C <- inner_join(Brapa_vs_DaAe_C,
+                                  DaAe_C_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for DaAe_A and Boleracea
+# Find the RBH between DaAe_A and Boleracea
+Boleracea_vs_DaAe <- read_table("BlastP/Boleracea_HDEM_vs_DaAe.out.gz", col_names = headers) %>% filter(!grepl("_Random_", query.acc.ver))
+Boleracea_vs_DaAe_A <- Boleracea_vs_DaAe %>%
+  filter(grepl("BnachrA",query.acc.ver))
+DaAe_vs_Boleracea <- read_table("BlastP/DaAe_vs_Boleracea_HDEM.out.gz", col_names = headers) %>% filter(!grepl("_Random_", subject.acc.ver))
+DaAe_A_vs_Boleracea <- DaAe_vs_Boleracea %>%
+  filter(grepl("BnachrA",subject.acc.ver))
+
+# Filter for best hits
+Boleracea_vs_DaAe_A <- Boleracea_vs_DaAe_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+DaAe_A_vs_Boleracea <- DaAe_A_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+
+# Merge together
+Boleracea_and_DaAe_A <- inner_join(Boleracea_vs_DaAe_A,
+                                  DaAe_A_vs_Boleracea,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for DaAe_C and Boleracea
+# Find the RBH between DaAe_C and Boleracea
+Boleracea_vs_DaAe_C <- Boleracea_vs_DaAe %>%
+  filter(grepl("BnachrC",query.acc.ver))
+DaAe_C_vs_Boleracea <- DaAe_vs_Boleracea %>%
+  filter(grepl("BnachrC",subject.acc.ver))
+
+# Filter for best hits
+Boleracea_vs_DaAe_C <- Boleracea_vs_DaAe_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+DaAe_C_vs_Boleracea <- DaAe_C_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+
+# Merge together
+Boleracea_and_DaAe_C <- inner_join(Boleracea_vs_DaAe_C,
+                                  DaAe_C_vs_Boleracea,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for DaAe_A and DaAe_C
+# Find the RBH between DaAe_A and DaAe_C
+DaAe_A_vs_DaAe_C <- read_table("BlastP/DaAe_A_vs_DaAe_C.out.gz", col_names = headers) %>% filter(!grepl("_Random_", query.acc.ver))
+DaAe_C_vs_DaAe_A <- read_table("BlastP/DaAe_C_vs_DaAe_A.out.gz", col_names = headers) %>% filter(!grepl("_Random_", subject.acc.ver))
+
+# Filter for best hits
+DaAe_A_vs_DaAe_C <- DaAe_A_vs_DaAe_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+DaAe_C_vs_DaAe_A <- DaAe_C_vs_DaAe_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE)
+
+# Merge together
+DaAe_A_and_DaAe_C <- inner_join(DaAe_A_vs_DaAe_C,
+                                  DaAe_C_vs_DaAe_A,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+```
+
