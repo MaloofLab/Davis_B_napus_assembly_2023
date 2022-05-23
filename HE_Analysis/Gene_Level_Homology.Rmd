@@ -397,17 +397,18 @@ DC_Pseudo_napus_Formatter <- function(ArCo,
                                     CoCn,
                                     Double_C,
                                     cutoff = 2.5){
-  df <- Query_Alignment %>%
+  df <- CoCn %>%
     filter(query.acc.ver %in% Double_C$query.acc.ver) %>%
     select(subject.acc.ver) %>%
-    inner_join(Progenitor_Alignment, by = c("subject.acc.ver" = "query.acc.ver")) %>%
-    select(qseqid = qseqid.y, sseqid = qseqid) %>%
-    left_join(Progenitor_Genes %>%
-                select(geneid, adjusted_coverage), by = c("qseqid" = "geneid")) %>%
-    select(Rapa = qseqid, Oleracea = sseqid, Rapa_coverage = adjusted_coverage) %>%
-    left_join(Progenitor_Genes %>%
-                select(geneid, adjusted_coverage), by = c("Oleracea" = "geneid")) %>%
-    select(Rapa, Oleracea, Rapa_coverage, Oleracea_coverage = adjusted_coverage) %>%
+    inner_join(ArCo, by = c("subject.acc.ver" = "query.acc.ver")) %>%
+    select(qseqid = subject.acc.ver.y, sseqid = subject.acc.ver) %>%
+    mutate(qseqid = str_remove(qseqid, "Parent=")) %>%
+    left_join(Pseudo_napus_Coverage %>%
+                select(GeneId, Adjusted_Coverage), by = c("qseqid" = "GeneId")) %>%
+    select(Rapa = qseqid, Oleracea = sseqid, Rapa_coverage = Adjusted_Coverage) %>%
+    left_join(Pseudo_napus_Coverage %>%
+                select(GeneId, Adjusted_Coverage), by = c("Oleracea" = "GeneId")) %>%
+    select(Rapa, Oleracea, Rapa_coverage, Oleracea_coverage = Adjusted_Coverage) %>%
     filter(Oleracea_coverage > 0 & Oleracea_coverage > cutoff*Rapa_coverage) %>%
     mutate(Ratio = round(Oleracea_coverage/Rapa_coverage,2)) %>%
     arrange(Rapa)
@@ -420,4 +421,63 @@ DC_Pseudo_napus_DaAe <- DC_Pseudo_napus_Formatter(Brapa_and_Boleracea,
                                                   DaAe_Double_C,
                                                   cutoff = 2.5)
 
+```
+
+# Double A and Double C in Napus genes
+
+```{r}
+Double_Pseudo_napus_Formatter <- function(Query_Coverage, Double, cutoff_min = 0.5, cutoff_max = 1.5){
+  df <- Double %>%
+    select(qseqid = query.acc.ver, sseqid = subject.acc.ver) %>%
+    left_join(Query_Coverage, by = c("sseqid" = "GeneId")) %>%
+    select(Genome_A = sseqid, Genome_C = qseqid, Genome_A_coverage = Adjusted_Coverage) %>%
+    left_join(Query_Coverage, by = c("Genome_C" = "GeneId")) %>%
+    select(Genome_A, Genome_C, Genome_A_coverage, Genome_C_coverage = Adjusted_Coverage) %>%
+    mutate(Ratio = round(Genome_A_coverage / Genome_C_coverage, 2)) %>%
+    filter(Genome_A_coverage > 0 & Genome_C_coverage > 0 & Ratio >= cutoff_min & Ratio <= cutoff_max) %>%
+    arrange(Genome_A)
+  return(df)
+}
+
+DA_DaAe <- Double_Pseudo_napus_Formatter(DaAe_Coverage, DaAe_Double_A)
+DC_DaAe <- Double_Pseudo_napus_Formatter(DaAe_Coverage, DaAe_Double_C)
+```
+
+## Combining the progenitor and napus coverages
+
+```{r}
+
+Coverage_Combiner <- function(Progenitor_Alignment, Progenitor_Coverage, Query_Alignment, Query_Alignment_2, Query_Coverage){
+  df <- Query_Alignment %>%
+    filter(qseqid %in% Progenitor_Coverage$Rapa) %>%
+    filter(sseqid %in% Query_Coverage$Genome_A) %>%
+    select(Rapa = qseqid, Genome_A = sseqid) %>%
+    left_join(Progenitor_Alignment, by = c("Rapa" = "qseqid")) %>%
+    filter(sseqid %in% Progenitor_Coverage$Oleracea) %>%
+    select(Rapa, Oleracea = sseqid, Genome_A) %>%
+    left_join(Query_Alignment_2, by = c("Oleracea" = "qseqid")) %>%
+    filter(sseqid %in% Query_Coverage$Genome_C) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C = "sseqid") %>%
+    left_join(Query_Coverage %>%
+                select(Genome_A, Ratio)) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio = Ratio) %>%
+    left_join(Progenitor_Coverage %>%
+                select(Rapa, Ratio)) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio, Progenitor_Ratio = Ratio) %>%
+    arrange(Rapa) %>%
+    mutate(Progenitor_Ratio = ifelse(is.infinite(Progenitor_Ratio),
+                                     5,
+                                     ifelse(Progenitor_Ratio > 5,
+                                            5,
+                                            Progenitor_Ratio)),
+           Group = 1:nrow(.))
+  return(df)
+}
+
+DA_Combined_DaAe <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_DaAe, Best_DaAe_ArAn, DaAe_CoCn, DA_DaAe)
+DA_Combined_Reference <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_Reference, Best_Reference_ArAn, Reference_CoCn, DA_Reference)
+DA_Combined_Tapidor <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_Tapidor, Best_Tapidor_ArAn, Tapidor_CoCn, DA_Tapidor)
+DC_Combined_DaAe <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_DaAe, Best_DaAe_ArAn, DaAe_CoCn, DC_DaAe)
+DC_Combined_Reference <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_Reference, Best_Reference_ArAn, Reference_CoCn, DC_Reference)
+DC_Combined_Tapidor <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_Tapidor, Best_Tapidor_ArAn, Tapidor_CoCn, DC_Tapidor)
 ```
