@@ -447,37 +447,61 @@ DC_DaAe <- Double_Pseudo_napus_Formatter(DaAe_Coverage, DaAe_Double_C)
 
 ```{r}
 
-Coverage_Combiner <- function(Progenitor_Alignment, Progenitor_Coverage, Query_Alignment, Query_Alignment_2, Query_Coverage){
+Coverage_Combiner <- function(ArCo, ArCo_Coverage, Query_Alignment, Query_Alignment_2, Query_Coverage){
   df <- Query_Alignment %>%
-    filter(qseqid %in% Progenitor_Coverage$Rapa) %>%
-    filter(sseqid %in% Query_Coverage$Genome_A) %>%
-    select(Rapa = qseqid, Genome_A = sseqid) %>%
-    left_join(Progenitor_Alignment, by = c("Rapa" = "qseqid")) %>%
-    filter(sseqid %in% Progenitor_Coverage$Oleracea) %>%
-    select(Rapa, Oleracea = sseqid, Genome_A) %>%
-    left_join(Query_Alignment_2, by = c("Oleracea" = "qseqid")) %>%
-    filter(sseqid %in% Query_Coverage$Genome_C) %>%
-    select(Rapa, Oleracea, Genome_A, Genome_C = "sseqid") %>%
+    mutate(subject.acc.ver = str_remove(subject.acc.ver, "Parent=")) %>%
+    filter(subject.acc.ver %in% ArCo_Coverage$Rapa) %>%
+    filter(query.acc.ver %in% Query_Coverage$Genome_A) %>%
+    select(Rapa = subject.acc.ver, Genome_A = query.acc.ver) %>%
+    left_join(ArCo %>% mutate(subject.acc.ver = str_remove(subject.acc.ver, "Parent=")),
+              by = c("Rapa" = "subject.acc.ver")) %>%
+    filter(query.acc.ver %in% ArCo_Coverage$Oleracea) %>%
+    select(Rapa, Oleracea = query.acc.ver, Genome_A) %>%
+    left_join(Query_Alignment_2, by = c("Oleracea" = "subject.acc.ver")) %>%
+    filter(query.acc.ver %in% Query_Coverage$Genome_C) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C = "query.acc.ver") %>%
     left_join(Query_Coverage %>%
                 select(Genome_A, Ratio)) %>%
     select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio = Ratio) %>%
-    left_join(Progenitor_Coverage %>%
+    left_join(ArCo_Coverage %>%
                 select(Rapa, Ratio)) %>%
-    select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio, Progenitor_Ratio = Ratio) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio, ArCo_Ratio = Ratio) %>%
     arrange(Rapa) %>%
-    mutate(Progenitor_Ratio = ifelse(is.infinite(Progenitor_Ratio),
+    mutate(ArCo_Ratio = ifelse(is.infinite(ArCo_Ratio),
                                      5,
-                                     ifelse(Progenitor_Ratio > 5,
+                                     ifelse(ArCo_Ratio > 5,
                                             5,
-                                            Progenitor_Ratio)),
+                                            ArCo_Ratio)),
            Group = 1:nrow(.))
   return(df)
 }
 
-DA_Combined_DaAe <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_DaAe, Best_DaAe_ArAn, DaAe_CoCn, DA_DaAe)
-DA_Combined_Reference <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_Reference, Best_Reference_ArAn, Reference_CoCn, DA_Reference)
-DA_Combined_Tapidor <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_Tapidor, Best_Tapidor_ArAn, Tapidor_CoCn, DA_Tapidor)
-DC_Combined_DaAe <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_DaAe, Best_DaAe_ArAn, DaAe_CoCn, DC_DaAe)
-DC_Combined_Reference <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_Reference, Best_Reference_ArAn, Reference_CoCn, DC_Reference)
-DC_Combined_Tapidor <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_Tapidor, Best_Tapidor_ArAn, Tapidor_CoCn, DC_Tapidor)
+DA_Combined_DaAe <- Coverage_Combiner(Brapa_and_Boleracea, DA_Pseudo_napus_DaAe, Brapa_and_DaAe_A, Boleracea_and_DaAe_C, DA_DaAe)
+DC_Combined_DaAe <- Coverage_Combiner(Brapa_and_Boleracea, DC_Pseudo_napus_DaAe, Brapa_and_DaAe_A, Boleracea_and_DaAe_C, DC_DaAe)
+
+```
+
+```{r}
+save(DA_Combined_DaAe, DC_Combined_DaAe, file = "gene_doublings.RData")
+```
+
+### Extracting positions of genes
+
+```{r}
+
+Position_Extract <- function(Combined_Coverage, Pseudo_napus_Coverage, Napus_Coverage){
+  GeneId <- c(Combined_Coverage$Rapa,Combined_Coverage$Oleracea,Combined_Coverage$Genome_A,Combined_Coverage$Genome_C)
+  Group = rep(Combined_Coverage$Group,4)
+  Assembly = rep(c("Pseudo_napus", "Napus"), each = length(geneid)/2)
+  df <- data.frame(GeneId, Group, Assembly, stringsAsFactors = F)
+  df <- df %>%
+    left_join(rbind(Pseudo_napus_Coverage, Napus_Coverage) %>%
+                select(GeneId, Chromosome, Position))
+  return(df)
+}
+
+DA_DaAe_Positions <- Position_Extract(DA_Combined_DaAe, Pseudo_napus_Coverage, DaAe_Coverage)
+DC_DaAe_Positions <- Position_Extract(DC_Combined_DaAe, Pseudo_napus_Coverage, DaAe_Coverage)
+
+save(DA_DaAe_Positions, DC_DaAe_Positions, file = "Gene_Positions.RData")
 ```
