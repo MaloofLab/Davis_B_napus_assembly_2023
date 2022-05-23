@@ -107,7 +107,7 @@ for (i in chroms) {
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
                  })
-  ggsave(paste0("Coverage_Plots_20220523/",i,".png"), width = 10, height = 10)
+  ggsave(paste0("Coverage_Plots_20220523/",i,".png"))
 }
 ```
 

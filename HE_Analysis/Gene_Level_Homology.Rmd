@@ -492,7 +492,7 @@ save(DA_Combined_DaAe, DC_Combined_DaAe, file = "gene_doublings.RData")
 Position_Extract <- function(Combined_Coverage, Pseudo_napus_Coverage, Napus_Coverage){
   GeneId <- c(Combined_Coverage$Rapa,Combined_Coverage$Oleracea,Combined_Coverage$Genome_A,Combined_Coverage$Genome_C)
   Group = rep(Combined_Coverage$Group,4)
-  Assembly = rep(c("Pseudo_napus", "Napus"), each = length(geneid)/2)
+  Assembly = rep(c("Pseudo_napus", "Napus"), each = length(GeneId)/2)
   df <- data.frame(GeneId, Group, Assembly, stringsAsFactors = F)
   df <- df %>%
     left_join(rbind(Pseudo_napus_Coverage, Napus_Coverage) %>%
