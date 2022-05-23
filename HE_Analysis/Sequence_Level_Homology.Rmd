@@ -1,0 +1,113 @@
+---
+title: "Sequence_Level_Homology"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+## Read in the calculated coverages
+Coverage_Readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = c("Chromosome","Start","End","GeneId","Score","Strand","Coverage", "Covered", "Size", "Ratio"),
+                   delim = "\t") %>%
+    mutate(Adjusted_Coverage = round(Coverage / Size, 2),
+           Position = floor((End + Start) / 2)) %>%
+    group_by(Chromosome) %>%
+    mutate(Chromosome_Average = mean(Adjusted_Coverage, na.rm = T),
+           Chromosome_SD = sd(Adjusted_Coverage, na.rm = T),
+           Relative_Coverage = round(Adjusted_Coverage / Chromosome_Average, 2),
+           Relative_Coverage = ifelse(Relative_Coverage >= 10, NA, Relative_Coverage),
+           Std_Relative_Coverage = scale(Relative_Coverage)) %>%
+    ungroup()
+  return(df)
+}
+
+Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
+DaAe_Coverage <- Coverage_Readin("Coverages/Gene/DaAe_Gene_coverage.tsv")
+```
+
+# Format the data a bit
+
+```{r}
+Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
+  mutate(Assembly = "Pseudo_napus",
+         Chromosome = ifelse(grepl("C", Chromosome),
+                             str_replace(Chromosome, "C", "chrC0"),
+                             paste0("chr",Chromosome))
+  )
+DaAe_Coverage$Assembly <- "DaAe"
+All_Coverage <- rbind(Pseudo_napus_Coverage, DaAe_Coverage)
+```
+
+## Clustering a bit
+
+```{r}
+# Set the value of each point equal to most frequent rounded value in 20 neighbors will have to burn in 10
+Clustered_Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
+  mutate(Consensus = NA)
+
+for(i in 11:(nrow(Clustered_Pseudo_napus_Coverage)-10)){
+  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  Winner <- median(Neighbors, na.rm = T)
+  if(is_empty(Winner)) Winner <- Clustered_Pseudo_napus_Coverage$Consensus[i-1]
+  Clustered_Pseudo_napus_Coverage$Consensus[i] <- round(mean(Winner),1)
+}
+
+# Factor in Napus
+
+Clustered_DaAe_Coverage <- DaAe_Coverage %>%
+  mutate(Consensus = NA)
+
+for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
+  Neighbors <- round(Clustered_DaAe_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
+  Winner <- median(Neighbors, na.rm = T)
+  if(is_empty(Winner)) Winner <- Clustered_DaAe_Coverage$Consensus[i-1]
+  Clustered_DaAe_Coverage$Consensus[i] <- round(mean(Winner),1)
+}
+
+Clustered_All <- rbind(Clustered_Pseudo_napus_Coverage, Clustered_DaAe_Coverage)
+```
+
+### Plots
+
+```{r}
+chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
+for (i in chroms) {
+  Clustered_All %>% filter(Chromosome == i) %>%
+    mutate(Consensus = ifelse(Consensus >= 4,
+                                          4,
+                                          ifelse(Consensus <= -4,
+                                                 -4,
+                                                 Consensus))) %>%
+    ggplot(aes(x = Position, y = Consensus)) +
+    geom_point(aes(colour = cut(Consensus, c(-Inf, -1, 1, Inf)))) +
+    scale_color_manual(name = "Consensus",
+                     values = c("(-Inf,-1]" = "red",
+                                  "(-1,1]" = "black",
+                                  "(1, Inf]" = "blue"),
+                     labels = c("<= -1", "-1 < Consensus <= 1", "> 1")) +
+    ggtitle(i) +
+    geom_hline(yintercept = 1, color="black") +
+    geom_hline(yintercept = 0, color="black") +
+    geom_hline(yintercept = -1, color="black") +
+    facet_wrap(~Assembly,
+               ncol = 2,
+               labeller = function (labels) {
+                 labels <- lapply(labels, as.character)
+                 labels[[1]] <- paste("Assembly:", labels[[1]])
+                 a <-  do.call(paste,c(labels, list(sep = "\n")))
+                 list(gsub("_","",a))
+                 })
+  ggsave(paste0("Coverage_Plots_20220523/",i,".png"), width = 10, height = 10)
+}
+```
+
