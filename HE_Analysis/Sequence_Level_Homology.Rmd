@@ -13,11 +13,12 @@ library(tidyverse)
 
 ```{r}
 ## Read in the calculated coverages
+coverage_columns <- c("Chromosome", "Start", "End", "Reads", "Covered", "Size", "Ratio")
 Coverage_Readin <- function(filename){
   df <- read_delim(filename,
-                   col_names = c("Chromosome","Start","End","GeneId","Score","Strand","Coverage", "Covered", "Size", "Ratio"),
+                   col_names = coverage_columns,
                    delim = "\t") %>%
-    mutate(Adjusted_Coverage = round(Coverage / Size, 2),
+    mutate(Adjusted_Coverage = round(Reads / Size, 2),
            Position = floor((End + Start) / 2)) %>%
     group_by(Chromosome) %>%
     mutate(Chromosome_Average = mean(Adjusted_Coverage, na.rm = T),
@@ -29,8 +30,8 @@ Coverage_Readin <- function(filename){
   return(df)
 }
 
-Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
-DaAe_Coverage <- Coverage_Readin("Coverages/Gene/DaAe_Gene_coverage.tsv")
+Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Sequence/pseudo_napus_coverage.tsv")
+DaAe_Coverage <- Coverage_Readin("Coverages/Sequence/DaAe_coverage.tsv")
 ```
 
 # Format the data a bit
@@ -43,7 +44,7 @@ Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
                              paste0("chr",Chromosome))
   )
 DaAe_Coverage$Assembly <- "DaAe"
-All_Coverage <- rbind(Pseudo_napus_Coverage, DaAe_Coverage)
+#All_Coverage <- rbind(Pseudo_napus_Coverage, DaAe_Coverage)
 ```
 
 ## Clustering a bit
@@ -75,6 +76,7 @@ for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
 }
 
 Clustered_All <- rbind(Clustered_Pseudo_napus_Coverage, Clustered_DaAe_Coverage)
+Clustered_All$Assembly <- factor(Clustered_All$Assembly, levels = c("Pseudo_napus", "DaAe"))
 ```
 
 ### Plots
@@ -107,7 +109,13 @@ for (i in chroms) {
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
                  })
-  ggsave(paste0("Coverage_Plots_20220523/",i,".png"))
+  ggsave(paste0("Coverage_Plots_20220607/",i,".png"))
 }
+```
+
+# Add in more napus genomes
+
+```{r}
+
 ```
 
