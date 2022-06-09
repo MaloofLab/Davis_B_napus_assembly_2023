@@ -1,0 +1,616 @@
+---
+title: "Gene_HE_Analysis"
+author: "John D."
+date: "2/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+Annotations for Da-Ae, Brassica rapa, and Brassica oleracea were used to look for homeologous exchange. GFF annotations were converted to BED format using JCVI's jcvi.formats.gff module. The BED files were combined with their corresponding CDS files in JCVI's MCscan pipeline to align the various gene annotations to one another. Six pairwise alignments were performed. B.rapa-B.oleracea, DaAe_A-DaAe_C, B.rapa-DaAe_A, B.rapa-DaAe_C, B.oleracea-DaAe_A, and B.oleracea-DaAe_C. A C-score cutoff of .99 was used to filter the LAST hit to contain reciprocal best hit (RBH). As stated on Github, "C-score is defined by the ratio of LAST hit to the best BLAST hits to either the query and hit". Given the nature of this approach, results rely heavily on the accuracy and completeness of the annotations being used in the analysis.
+
+```{r}
+#Read in the JCVI alignments
+
+alignment_readin <- function(filename){
+  read_delim(filename,
+             col_names = c("qseqid", "sseqid", "pident", "length", "mismatch", "gapopen",
+                           "qstart", "qend", "sstart", "send", "evalue", "bitscore"),
+             delim = "\t")
+}
+
+# Progenitor
+Progenitor <- alignment_readin("Alignments/Brassica_rapa.Brassica_oleracea.last.filtered")
+
+# DaAe
+DaAe <- alignment_readin("Alignments/DaAe_A.DaAe_C.last.filtered")
+DaAe_ArAn <- alignment_readin("Alignments/Brassica_rapa.DaAe_A.last.filtered")
+DaAe_ArCn<- alignment_readin("Alignments/Brassica_rapa.DaAe_C.last.filtered")
+DaAe_CoAn <- alignment_readin("Alignments/Brassica_oleracea.DaAe_A.last.filtered")
+DaAe_CoCn <- alignment_readin("Alignments/Brassica_oleracea.DaAe_C.last.filtered")
+
+# Reference
+Reference <- alignment_readin("Alignments/Darmor_A.Darmor_C.last.filtered")
+Reference_ArAn <- alignment_readin("Alignments/Brassica_rapa.Darmor_A.last.filtered")
+Reference_ArCn<- alignment_readin("Alignments/Brassica_rapa.Darmor_C.last.filtered")
+Reference_CoAn <- alignment_readin("Alignments/Brassica_oleracea.Darmor_A.last.filtered")
+Reference_CoCn <- alignment_readin("Alignments/Brassica_oleracea.Darmor_C.last.filtered")
+
+# Tapidor
+Tapidor <- alignment_readin("Alignments/Tapidor_A.Tapidor_C.last.filtered")
+Tapidor_ArAn <- alignment_readin("Alignments/Brassica_rapa.Tapidor_A.last.filtered")
+Tapidor_ArCn<- alignment_readin("Alignments/Brassica_rapa.Tapidor_C.last.filtered")
+Tapidor_CoAn <- alignment_readin("Alignments/Brassica_oleracea.Tapidor_A.last.filtered")
+Tapidor_CoCn <- alignment_readin("Alignments/Brassica_oleracea.Tapidor_C.last.filtered")
+```
+
+Although using a C-score cutoff should report back only RBHs, it is still possible for a tie to occur between a query sequence and two or more subject sequences. In this case, the alignments were filtered down to contain the alignments which had the highest bit score.
+
+```{r}
+#Filter for best hit in each alignment
+
+alignment_filter <- function(alignment){
+  alignment %>%
+  group_by(qseqid) %>%
+  arrange(qseqid,-bitscore) %>%
+  slice(1) %>% # Find the best hit for each queryid
+  ungroup() %>%
+  group_by(sseqid) %>%
+  arrange(sseqid,-bitscore) %>%
+  slice(1) %>% # Find the best hit for each subject id
+  ungroup() %>%
+  arrange(qseqid)
+}
+
+# Progenitor
+Best_Progenitor <- alignment_filter(Progenitor)
+
+# DaAe
+Best_DaAe <- alignment_filter(DaAe)
+Best_DaAe_ArAn <- alignment_filter(DaAe_ArAn)
+Best_DaAe_ArCn <- alignment_filter(DaAe_ArCn)
+Best_DaAe_CoAn <- alignment_filter(DaAe_CoAn)
+Best_DaAe_CoCn <- alignment_filter(DaAe_CoCn)
+
+# Reference
+Best_Reference <- alignment_filter(Reference)
+Best_Reference_ArAn <- alignment_filter(Reference_ArAn)
+Best_Reference_ArCn <- alignment_filter(Reference_ArCn)
+Best_Reference_CoAn <- alignment_filter(Reference_CoAn)
+Best_Reference_CoCn <- alignment_filter(Reference_CoCn)
+
+# Tapidor
+Best_Tapidor <- alignment_filter(Tapidor)
+Best_Tapidor_ArAn <- alignment_filter(Tapidor_ArAn)
+Best_Tapidor_ArCn <- alignment_filter(Tapidor_ArCn)
+Best_Tapidor_CoAn <- alignment_filter(Tapidor_CoAn)
+Best_Tapidor_CoCn <- alignment_filter(Tapidor_CoCn)
+```
+
+For simplicity of the analysis, orthogonal genes between B.rapa and B.oleracea were used to filter potential sites of homeologous exchange between DaAe's two subgenomes, A and C. Homeologous exchange is the exchange of genetic material from one subgenome to the other. In this case it would be the conversion of an A subgenome gene to a C subgenome gene or vice versa. Brassica napus is an allo-tetraploid containing two diploid subgenomes A and C, meaning homeologous exchange can result in homeologous gene ratios of 2:2, 3:1, and 4:0 corresponding to a reciprocal, partial, or complete gene transversion. Because the present assembly is unphased, attempting to identify potential 3:1 homeologous gene ratios is inhibited by the assembler program either selecting one of the two homeologous genes or creating a mashup of the two genes when creating the consensus sequence. In both cases, the true underlying biology is not being accurately represented in the assembly sequence. For this reason, complete gene transversions were the group of focus in this homeologous analysis.
+
+## Find potential sites where a C gene in the C subgenome was converted to an A gene
+
+For a potential homeologous gene pair to be considered as a possible site of homeologous exchange, two requirements must be met. First, the gene must align better to its homeolog than it does to its ortholog. Second, the gene must also align better to its homeolog's ortholog than it does to its ortholog. If an annotation is incomplete or erroneous, it can create both false positive and false negative results.
+
+Compare alignments
+If HE both true:
+  Rule 1: An-Cn > Co-Cn
+  Rule 2: Ar-Cn > Co-Cn
+
+```{r}
+
+HE_of_A <- function(Progenitor, ArAn, ArCn, CoCn, AnCn, name){
+  name <- paste0("_", name)
+  # Filter
+  Filtered_ArAn <- ArAn %>%
+    filter(qseqid %in% Progenitor$qseqid)
+  Filtered_AnCn <- AnCn %>%
+    filter(qseqid %in% Filtered_ArAn$sseqid)
+
+  # Smaller data frames
+  Small_AnCn <- Filtered_AnCn %>%
+    select(qseqid,sseqid,pident,length,bitscore)
+  Small_CoCn <- CoCn %>%
+    select(qseqid,sseqid,pident,length,bitscore)
+  Small_ArCn <- ArCn %>%
+    select(qseqid,sseqid,pident,length,bitscore)
+  
+  # Rule 1 genes An-Cn > Co-Cn
+  filter_name <- paste0("bitscore", name)
+  Passed_Rule_1 <- Small_AnCn %>%
+    left_join(Small_CoCn, by = c("sseqid" = "sseqid"), suffix = c(name,"_Oleracea")) %>%
+    filter(get(paste0("bitscore", name)) > bitscore_Oleracea)
+  
+  # Rule 2 genes Ar-Cn > Co-Cn
+  Passed_Rule_2 <- Small_ArCn %>%
+    left_join(Small_CoCn, by = c("sseqid" = "sseqid"), suffix = c("_Rapa","_Oleracea")) %>%
+    filter(bitscore_Rapa > bitscore_Oleracea)
+  
+  # Combine rules
+  Small_Rule_1 <- Passed_Rule_1 %>%
+    select(qseqid = paste0("qseqid", name), sseqid)
+  Small_Rule_2 <- Passed_Rule_2 %>%
+    select(qseqid = qseqid_Rapa, sseqid)
+  Combined_Rules <- Small_Rule_1 %>%
+    filter(sseqid %in% Small_Rule_2$sseqid)
+  Possible_Double_A <- Combined_Rules %>%
+    left_join(Filtered_AnCn)
+  
+  return(Possible_Double_A)
+}
+
+DaAe_Double_A <- HE_of_A(Best_Progenitor, Best_DaAe_ArAn, Best_DaAe_ArCn, Best_DaAe_CoCn, Best_DaAe, "DaAe")
+Reference_Double_A <- HE_of_A(Best_Progenitor, Best_Reference_ArAn, Best_Reference_ArCn, Best_Reference_CoCn, Best_Reference, "Reference")
+Tapidor_Double_A <- HE_of_A(Best_Progenitor, Best_Tapidor_ArAn, Best_Tapidor_ArCn, Best_Tapidor_CoCn, Best_Tapidor, "Tapidor")
+```
+
+## Find potential sites where an A gene in the A subgenome was converted to a C gene
+
+Compare alignments
+If HE both true:
+  Rule 1: An-Cn > Ar-An
+  Rule 2: Co-An > Ar-An
+
+```{r}
+HE_of_C <- function(Progenitor, ArAn, CoAn, CoCn, AnCn, name){
+  name <- paste0("_", name)
+  # Filter
+  Filtered_CoCn <- CoCn %>%
+    filter(qseqid %in% Progenitor$sseqid)
+  Filtered_AnCn <- AnCn %>%
+    filter(sseqid %in% Filtered_CoCn$sseqid)
+
+  # Smaller data frames
+  Small_AnCn <- Filtered_AnCn %>%
+    select(qseqid,sseqid,pident,length,bitscore)
+  Small_ArAn <- ArAn %>%
+    select(qseqid,sseqid,pident,length,bitscore)
+  Small_CoAn <- CoAn %>%
+    select(qseqid,sseqid,pident,length,bitscore)
+  
+  # Rule 1 genes An-Cn > Ar-An
+  Passed_Rule_1 <- Small_AnCn %>%
+    left_join(Small_ArAn, by = c("qseqid" = "sseqid"), suffix = c(name,"_Rapa")) %>%
+    filter(get(paste0("bitscore", name)) > bitscore_Rapa)
+  
+  # Rule 2 genes Co-An > Ar-An
+  Passed_Rule_2 <- Small_CoAn %>%
+    left_join(Small_ArAn, by = c("sseqid" = "sseqid"), suffix = c("_Oleracea","_Rapa")) %>%
+    filter(bitscore_Oleracea > bitscore_Rapa)
+  
+  # Combine rules
+  Small_Rule_1 <- Passed_Rule_1 %>%
+    select(qseqid, sseqid)
+  Small_Rule_2 <- Passed_Rule_2 %>%
+    select(qseqid = qseqid_Oleracea, sseqid)
+  Combined_Rules <- Small_Rule_1 %>%
+    filter(qseqid %in% Small_Rule_2$sseqid)
+  Possible_Double_C <- Combined_Rules %>%
+    left_join(Filtered_AnCn)
+  
+  return(Possible_Double_C)
+}
+
+DaAe_Double_C <- HE_of_C(Best_Progenitor, Best_DaAe_ArAn, Best_DaAe_CoAn, Best_DaAe_CoCn, Best_DaAe, "DaAe")
+Reference_Double_C <- HE_of_C(Best_Progenitor, Best_Reference_ArAn, Best_Reference_CoAn, Best_Reference_CoCn, Best_Reference, "Reference")
+Tapidor_Double_C <- HE_of_C(Best_Progenitor, Best_Tapidor_ArAn, Best_Tapidor_CoAn, Best_Tapidor_CoCn, Best_Tapidor, "Tapidor")
+```
+
+
+
+## Looking at coverage of genes in BED files
+
+To look at the coverage of the genes listed in the BED files, the trimmed 10X reads were mapped to a combined progenitor genome containing A01-A10 from B.rapa and C01-C09 from B.oleracea using BWA. To look at possible sites of homeologous exchange, a subsample of reads with unique trustworthy mapping locations was desired. These were reads which could realiably be described as coming from either the A or C subgenome. Alignments were filtered to only contain reads which had a MAPQ of 5 or greater, were properly paired, had no supplementary alignments, and were primary alignments. This subsample of reads was then mapped to the DaAe assembly and filtered for alignments with a MAPQ of 5 or greater. The two alignment files, filtered progenitor and DaAe, were then used to calculate the coverage of their potential homeologous genes using samtools' bedcov and the previously created BED files.
+
+```{r}
+## Length of gene was also factored into coverage estimates
+## For simplicity, the coverage of all genes was calculated then subset for the potential HE genes
+## Starting with the coverage of the progenitor genes
+
+## Read in the calculated coverages
+progenitor_coverage_readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = c("chromosome","start","end","geneid","score","strand","coverage"),
+                   delim = "\t") %>%
+    mutate(adjusted_coverage = round(coverage / (end - start),2),
+           position = floor((end + start)/2)) %>%
+    group_by(chromosome) %>%
+    mutate(chromosome_average = mean(coverage),
+           chromosome_sd = sd(coverage),
+           adjusted_chromosome_average = mean(adjusted_coverage),
+           adjusted_chromosome_sd = sd(adjusted_coverage)) %>%
+    ungroup()
+  return(df)
+}
+
+coverage_readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = c("chromosome","start","end","geneid","score","strand","coverage_primary", "coverage_alt"),
+                   delim = "\t") %>%
+    mutate(coverage = coverage_primary + coverage_alt) %>%
+    select(-coverage_primary, -coverage_alt) %>%
+    mutate(adjusted_coverage = round(coverage / (end - start),2),
+           position = floor((end + start)/2)) %>%
+    group_by(chromosome) %>%
+    mutate(chromosome_average = mean(coverage),
+           chromosome_sd = sd(coverage),
+           adjusted_chromosome_average = mean(adjusted_coverage),
+           adjusted_chromosome_sd = sd(adjusted_coverage)) %>%
+    ungroup()
+  return(df)
+}
+
+Progenitor_DaAe_Coverage <- progenitor_coverage_readin("Coverages/Progenitor_DaAe_Gene_coverage.tsv")
+DaAe_Coverage <- coverage_readin("Coverages/DaAe_Gene_coverage.tsv")
+Progenitor_Reference_Coverage <- progenitor_coverage_readin("Coverages/Progenitor_Darmor_Gene_coverage.tsv")
+Reference_Coverage <- coverage_readin("Coverages/Darmor_Gene_coverage.tsv")
+Progenitor_Tapidor_Coverage <- progenitor_coverage_readin("Coverages/Progenitor_Tapidor_Gene_coverage.tsv")
+Tapidor_Coverage <- coverage_readin("Coverages/Tapidor_Gene_coverage.tsv")
+```
+
+# Double A in Progenitor genes
+
+```{r}
+DA_Progenitor_Formatter <- function(Progenitor_Alignment, Progenitor_Genes, Query_Alignment, Double_A, cutoff = 2.5){
+  df <- Query_Alignment %>%
+    filter(sseqid %in% Double_A$qseqid) %>%
+    select(qseqid) %>%
+    inner_join(Progenitor_Alignment) %>%
+    select(qseqid, sseqid) %>%
+    left_join(Progenitor_Genes %>%
+                select(geneid, adjusted_coverage), by = c("qseqid" = "geneid")) %>%
+    select(Rapa = qseqid, Oleracea = sseqid, Rapa_coverage = adjusted_coverage) %>%
+    left_join(Progenitor_Genes %>%
+                select(geneid, adjusted_coverage), by = c("Oleracea" = "geneid")) %>%
+    select(Rapa, Oleracea, Rapa_coverage, Oleracea_coverage = adjusted_coverage) %>%
+    filter(Rapa_coverage > 0 & Rapa_coverage > cutoff*Oleracea_coverage) %>%
+    mutate(Ratio = round(Rapa_coverage/Oleracea_coverage,2)) %>%
+    arrange(Rapa)
+  return(df)
+}
+
+DA_Progenitor_DaAe <- DA_Progenitor_Formatter(Best_Progenitor, Progenitor_DaAe_Coverage, Best_DaAe_ArAn, DaAe_Double_A)
+DA_Progenitor_Reference <- DA_Progenitor_Formatter(Best_Progenitor, Progenitor_Reference_Coverage, Best_Reference_ArAn, Reference_Double_A)
+DA_Progenitor_Tapidor <- DA_Progenitor_Formatter(Best_Progenitor, Progenitor_Tapidor_Coverage, Best_Tapidor_ArAn, Tapidor_Double_A)
+```
+
+# Double C in Progenitor genes
+
+```{r}
+DC_Progenitor_Formatter <- function(Progenitor_Alignment, Progenitor_Genes, Query_Alignment, Double_C, cutoff = 2.5){
+  df <- Query_Alignment %>%
+    filter(sseqid %in% Double_C$sseqid) %>%
+    select(qseqid) %>%
+    inner_join(Progenitor_Alignment, by = c("qseqid" = "sseqid")) %>%
+    select(qseqid = qseqid.y, sseqid = qseqid) %>%
+    left_join(Progenitor_Genes %>%
+                select(geneid, adjusted_coverage), by = c("qseqid" = "geneid")) %>%
+    select(Rapa = qseqid, Oleracea = sseqid, Rapa_coverage = adjusted_coverage) %>%
+    left_join(Progenitor_Genes %>%
+                select(geneid, adjusted_coverage), by = c("Oleracea" = "geneid")) %>%
+    select(Rapa, Oleracea, Rapa_coverage, Oleracea_coverage = adjusted_coverage) %>%
+    filter(Oleracea_coverage > 0 & Oleracea_coverage > cutoff*Rapa_coverage) %>%
+    mutate(Ratio = round(Oleracea_coverage/Rapa_coverage,2)) %>%
+    arrange(Rapa)
+  return(df)
+}
+
+DC_Progenitor_DaAe <- DC_Progenitor_Formatter(Best_Progenitor, Progenitor_DaAe_Coverage, Best_DaAe_CoCn, DaAe_Double_C)
+DC_Progenitor_Reference <- DC_Progenitor_Formatter(Best_Progenitor, Progenitor_Reference_Coverage, Best_Reference_CoCn, Reference_Double_C)
+DC_Progenitor_Tapidor <- DC_Progenitor_Formatter(Best_Progenitor, Progenitor_Tapidor_Coverage, Best_Tapidor_CoCn, Tapidor_Double_C)
+```
+
+# Double A and Double C in Napus genes
+
+```{r}
+Double_Napus_Formatter <- function(Query_Coverage, Double, cutoff_min = 0.5, cutoff_max = 1.5){
+  df <- Double %>%
+    select(qseqid, sseqid) %>%
+    left_join(Query_Coverage, by = c("qseqid" = "geneid")) %>%
+    select(Genome_A = qseqid, Genome_C = sseqid, Genome_A_coverage = adjusted_coverage) %>%
+    left_join(Query_Coverage, by = c("Genome_C" = "geneid")) %>%
+    select(Genome_A, Genome_C, Genome_A_coverage, Genome_C_coverage = adjusted_coverage) %>%
+    mutate(Ratio = round(Genome_A_coverage / Genome_C_coverage, 2)) %>%
+    filter(Genome_A_coverage > 0 & Genome_C_coverage > 0 & Ratio >= cutoff_min & Ratio <= cutoff_max) %>%
+    arrange(Genome_A)
+  return(df)
+}
+
+DA_DaAe <- Double_Napus_Formatter(DaAe_Coverage, DaAe_Double_A)
+DA_Reference <- Double_Napus_Formatter(Reference_Coverage, Reference_Double_A)
+DA_Tapidor <- Double_Napus_Formatter(Tapidor_Coverage, Tapidor_Double_A)
+DC_DaAe <- Double_Napus_Formatter(DaAe_Coverage, DaAe_Double_C)
+DC_Reference <- Double_Napus_Formatter(Reference_Coverage, Reference_Double_C)
+DC_Tapidor <- Double_Napus_Formatter(Tapidor_Coverage, Tapidor_Double_C)
+```
+
+## Combining the progenitor and napus coverages
+
+```{r}
+
+Coverage_Combiner <- function(Progenitor_Alignment, Progenitor_Coverage, Query_Alignment, Query_Alignment_2, Query_Coverage){
+  df <- Query_Alignment %>%
+    filter(qseqid %in% Progenitor_Coverage$Rapa) %>%
+    filter(sseqid %in% Query_Coverage$Genome_A) %>%
+    select(Rapa = qseqid, Genome_A = sseqid) %>%
+    left_join(Progenitor_Alignment, by = c("Rapa" = "qseqid")) %>%
+    filter(sseqid %in% Progenitor_Coverage$Oleracea) %>%
+    select(Rapa, Oleracea = sseqid, Genome_A) %>%
+    left_join(Query_Alignment_2, by = c("Oleracea" = "qseqid")) %>%
+    filter(sseqid %in% Query_Coverage$Genome_C) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C = "sseqid") %>%
+    left_join(Query_Coverage %>%
+                select(Genome_A, Ratio)) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio = Ratio) %>%
+    left_join(Progenitor_Coverage %>%
+                select(Rapa, Ratio)) %>%
+    select(Rapa, Oleracea, Genome_A, Genome_C, Napus_Ratio, Progenitor_Ratio = Ratio) %>%
+    arrange(Rapa) %>%
+    mutate(Progenitor_Ratio = ifelse(is.infinite(Progenitor_Ratio),
+                                     5,
+                                     ifelse(Progenitor_Ratio > 5,
+                                            5,
+                                            Progenitor_Ratio)),
+           Group = 1:nrow(.))
+  return(df)
+}
+
+DA_Combined_DaAe <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_DaAe, Best_DaAe_ArAn, DaAe_CoCn, DA_DaAe)
+DA_Combined_Reference <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_Reference, Best_Reference_ArAn, Reference_CoCn, DA_Reference)
+DA_Combined_Tapidor <- Coverage_Combiner(Best_Progenitor, DA_Progenitor_Tapidor, Best_Tapidor_ArAn, Tapidor_CoCn, DA_Tapidor)
+DC_Combined_DaAe <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_DaAe, Best_DaAe_ArAn, DaAe_CoCn, DC_DaAe)
+DC_Combined_Reference <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_Reference, Best_Reference_ArAn, Reference_CoCn, DC_Reference)
+DC_Combined_Tapidor <- Coverage_Combiner(Best_Progenitor, DC_Progenitor_Tapidor, Best_Tapidor_ArAn, Tapidor_CoCn, DC_Tapidor)
+```
+
+#Save alignments
+
+```{r}
+save(DA_Combined_DaAe, DA_Combined_Reference, DA_Combined_Tapidor,
+     DC_Combined_DaAe, DC_Combined_Reference, DC_Combined_Tapidor,
+     file = "gene_doublings.RData")
+```
+
+### Extracting positions of genes
+
+```{r}
+
+Position_Extract <- function(Combined_Coverage, Progenitor_Genes, Napus_Genes){
+  geneid <- c(Combined_Coverage$Rapa,Combined_Coverage$Oleracea,Combined_Coverage$Genome_A,Combined_Coverage$Genome_C)
+  Group = rep(Combined_Coverage$Group,4)
+  Assembly = rep(c("Progenitor", "Napus"), each = length(geneid)/2)
+  df <- data.frame(geneid, Group, Assembly, stringsAsFactors = F)
+  df <- df %>%
+    left_join(rbind(Progenitor_Genes, Napus_Genes) %>%
+                select(geneid, chromosome, position))
+  return(df)
+}
+
+DA_DaAe_Positions <- Position_Extract(DA_Combined_DaAe, Progenitor_DaAe_Coverage, DaAe_Coverage)
+DA_Reference_Positions <- Position_Extract(DA_Combined_Reference, Progenitor_Reference_Coverage, Reference_Coverage)
+DA_Tapidor_Positions <- Position_Extract(DA_Combined_Tapidor, Progenitor_Tapidor_Coverage, Tapidor_Coverage)
+DC_DaAe_Positions <- Position_Extract(DC_Combined_DaAe, Progenitor_DaAe_Coverage, DaAe_Coverage)
+DC_Reference_Positions <- Position_Extract(DC_Combined_Reference, Progenitor_Reference_Coverage, Reference_Coverage)
+DC_Tapidor_Positions <- Position_Extract(DC_Combined_Tapidor, Progenitor_Tapidor_Coverage, Tapidor_Coverage)
+
+save(DA_DaAe_Positions, DA_Reference_Positions, DA_Tapidor_Positions,
+     DC_DaAe_Positions, DC_Reference_Positions, DC_Tapidor_Positions,
+     file = "Gene_Positions.RData")
+```
+
+# Find shared sites
+
+```{r}
+Progenitor_Pull <- function(Alignment){
+  combined_name <- Alignment %>%
+  transmute(Progenitor_Pair = paste(Rapa,Oleracea, sep = "_")) %>%
+  pull(Progenitor_Pair)
+  return(combined_name)
+}
+DA_DaAe_Progenitors <- Progenitor_Pull(DA_Combined_DaAe)
+DC_DaAe_Progenitors <- Progenitor_Pull(DC_Combined_DaAe)
+DA_Reference_Progenitors <- Progenitor_Pull(DA_Combined_Reference)
+DC_Reference_Progenitors <- Progenitor_Pull(DC_Combined_Reference)
+DA_Tapidor_Progenitors <- Progenitor_Pull(DA_Combined_Tapidor)
+DC_Tapidor_Progenitors <- Progenitor_Pull(DC_Combined_Tapidor)
+
+library(VennDiagram)
+library(RColorBrewer)
+
+Plot3VennDiagram <-
+  function(title = "",
+           setlist = NULL,
+           setnames = c(),
+           filename = "") {
+    myCol <- brewer.pal(3, "Pastel2")
+    venn.diagram(
+      main = title,
+      main.cex = 1.5,
+      main.fontface = "bold",
+      x = setlist,
+      category.names = setnames,
+      filename = filename,
+      output = TRUE,
+      # Output features
+      imagetype = "png" ,
+      height = 1500 ,
+      width = 1500 ,
+      resolution = 300,
+      compression = "lzw",
+      # Circles
+      lwd = 2,
+      lty = 'blank',
+      fill = myCol,
+      # Numbers
+      cex = .8,
+      fontface = "bold",
+      fontfamily = "Arial",
+      # Set names
+      cat.cex = 1,
+      cat.fontface = "bold",
+      cat.default.pos = "outer",
+      cat.fontfamily = "Arial"
+    )
+  }
+
+setnames <- c("DaAe", "Darmor-bzh", "Tapidor")
+Double_A <- list(
+  DaAe = DA_DaAe_Progenitors,
+  Reference = DA_Reference_Progenitors,
+  Tapidor = DA_Tapidor_Progenitors
+)
+windowsFonts("Arial" = windowsFont("Arial"))
+Plot3VennDiagram(title = "C to A Conversion",
+                 setlist = Double_A,
+                 setnames = setnames,
+                 filename = "C_to_A_Venndiagram.png")
+
+Double_C <- list(
+  DaAe = DC_DaAe_Progenitors,
+  Reference = DC_Reference_Progenitors,
+  Tapidor = DC_Tapidor_Progenitors
+)
+Plot3VennDiagram(title = "A to C Conversion",
+                 setlist = Double_C,
+                 setnames = setnames,
+                 filename = "A_to_C_Venndiagram.png")
+
+# Reverse ratios
+sum(DA_DaAe_Progenitors %in% DC_Reference_Progenitors)
+sum(DA_DaAe_Progenitors %in% DC_Tapidor_Progenitors)
+sum(DC_DaAe_Progenitors %in% DA_Reference_Progenitors)
+sum(DC_DaAe_Progenitors %in% DA_Tapidor_Progenitors)
+sum(DA_Reference_Progenitors %in% DC_Tapidor_Progenitors)
+sum(DC_Reference_Progenitors %in% DA_Tapidor_Progenitors)
+```
+
+
+
+
+
+# Making blocks of genes
+
+```{r}
+Block_Maker <- function(Positions, block_size = 3, gap_size = 2e5){
+  df <- Positions %>%
+    arrange(chromosome, position) %>%
+    group_by(chromosome) %>%
+    mutate(Next = lag(position)) %>%
+    ungroup() %>%
+    mutate(block = NA,
+           unified_block = NA)
+  block <- 0
+  for(i in 1:nrow(df)){
+    if(is.na(df$Next[i])){
+      block <- block + 1
+      start <- df$position[i]
+      df$block[i] <- block
+    } else {
+      if(df$position[i] - start <= gap_size){
+        df$block[i] <- block
+        start <- df$position[i]
+      } else {
+        block <- block + 1
+        start <- df$position[i]
+        df$block[i] <- block
+      }
+    }
+  }
+  
+  blocks <- df %>%
+    group_by(block) %>%
+    tally() %>%
+    filter(n >= 3) %>%
+    ungroup() %>%
+    pull(block)
+  
+  df <- df %>%
+    filter(df$block %in% blocks)
+  
+  if(nrow(df) == 0) return(df)
+
+  for(i in 1:nrow(df)){
+    unified_block <- df %>%
+      filter(Group == df$Group[i]) %>%
+      filter(chromosome != df$chromosome[i]) %>%
+      pull(block)
+    df$unified_block[i] <- paste(sort(c(df$block[i],unified_block)), collapse = ",")
+  }
+  
+  unified_blocks <- df %>%
+    group_by(block,unified_block) %>%
+    tally() %>%
+    filter(n >= 3) %>%
+    ungroup() %>%
+    group_by(unified_block) %>%
+    tally() %>%
+    filter(n >= 3) %>%
+    ungroup() %>%
+    pull(unified_block)
+  
+  df <- df %>%
+    filter(df$unified_block %in% unified_blocks)
+  
+  if(nrow(df) == 0) return(df)
+  
+  df <- df %>%
+    mutate(unified_block = as.integer(as.factor(as.character(df$unified_block)))) %>%
+    group_by(unified_block) %>%
+    mutate(unified_y = jitter(1)) %>%
+    ungroup()
+  return(df)
+}
+
+DA_DaAe_Blocks <- Block_Maker(DA_DaAe_Positions)
+DA_Reference_Blocks <- Block_Maker(DA_Reference_Positions)
+DA_Tapidor_Blocks <- Block_Maker(DA_Tapidor_Positions)
+DC_DaAe_Blocks <- Block_Maker(DC_DaAe_Positions)
+DC_Reference_Blocks <- Block_Maker(DC_Reference_Positions)
+DC_Tapidor_Blocks <- Block_Maker(DC_Tapidor_Positions)
+```
+
+```{r}
+# Loop Through all chromosomes
+
+Plotter <- function(Prefix, Blocks, Double){
+  chroms <- Blocks %>%
+  filter(str_detect(chromosome, paste0('^',Double))) %>%
+  pull(chromosome) %>%
+  unique()
+  
+  for(i in chroms){
+  groups <- Blocks %>%
+    filter(Assembly == "Progenitor" & chromosome == i) %>%
+    pull(unified_block) %>%
+    unique()
+  
+  Blocks %>%
+    filter(unified_block %in% groups) %>%
+    ggplot(aes(
+      x = position,
+      y = 1,
+      color = as.numeric(as.factor(unified_block))
+    )) +
+    geom_point() +
+    facet_wrap(chromosome~Assembly, nrow = 2) +
+    scale_color_gradientn(colours = rainbow(10)) +
+    labs(color = "Cluster")
+  
+  ggsave(paste0("Plots/", Prefix, "_Double_", Double, "_Chromosome_", i, ".png"), width = 10, height = 10)
+  }
+}
+
+Plotter("DaAe", DA_DaAe_Blocks, "A")
+Plotter("DaAe", DC_DaAe_Blocks, "C")
+Plotter("Reference", DA_Reference_Blocks, "A")
+Plotter("Reference", DC_Reference_Blocks, "C")
+Plotter("Tapidor", DA_Tapidor_Blocks, "A")
+Plotter("Tapidor", DC_Tapidor_Blocks, "C")
+```

@@ -1,0 +1,124 @@
+---
+title: "Circos_Formating"
+author: "John D."
+date: "3/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+#Read in the JCVI alignments
+
+alignment_readin <- function(filename){
+  read_delim(filename,
+             col_names = c("qseqid", "sseqid", "pident", "length", "mismatch", "gapopen",
+                           "qstart", "qend", "sstart", "send", "evalue", "bitscore"),
+             delim = "\t")
+}
+
+# Progenitor
+Progenitor <- alignment_readin("Alignments/Brassica_rapa.Brassica_oleracea.last.filtered")
+
+# DaAe
+DaAe <- alignment_readin("Alignments/DaAe_A.DaAe_C.last.filtered")
+```
+
+```{r}
+#Filter for best hit in each alignment
+
+alignment_filter <- function(alignment){
+  alignment %>%
+  group_by(qseqid) %>%
+  arrange(qseqid,-bitscore) %>%
+  slice(1) %>% # Find the best hit for each queryid
+  ungroup() %>%
+  group_by(sseqid) %>%
+  arrange(sseqid,-bitscore) %>%
+  slice(1) %>% # Find the best hit for each subject id
+  ungroup() %>%
+  arrange(qseqid)
+}
+
+# Progenitor
+Best_Progenitor <- alignment_filter(Progenitor)
+
+# DaAe
+Best_DaAe <- alignment_filter(DaAe)
+```
+
+```{r}
+## Read in gene beds
+DaAe_Bed <- read_delim("Gene_Beds/DaAe.bed", delim = "\t",
+                       col_names = c("chromosome", "start", "end", "geneid", "AAA", "BBB"))
+
+Rapa_Bed <- read_delim("Gene_Beds/Brassica_rapa.bed", delim = "\t",
+                       col_names = c("chromosome", "start", "end", "geneid", "AAA", "BBB"))
+
+Oleracea_Bed <- read_delim("Gene_Beds/Brassica_oleracea.bed", delim = "\t",
+                       col_names = c("chromosome", "start", "end", "geneid", "AAA", "BBB"))
+```
+
+```{r}
+# Combine the data
+DaAe_A <- Best_DaAe %>%
+  select(geneid = qseqid) %>%
+  left_join(DaAe_Bed %>%
+              select(chromosome, start, end, geneid))
+DaAe_A$gid <- paste0("color=chr",DaAe_A %>% group_indices(chromosome))
+  
+
+DaAe_C <- Best_DaAe %>%
+  select(geneid = sseqid) %>%
+  left_join(DaAe_Bed %>%
+              select(chromosome, start, end, geneid))
+
+DaAe_Links <- data.frame(DaAe_A$chromosome, DaAe_A$start, DaAe_A$end,
+                         DaAe_C$chromosome, DaAe_C$start, DaAe_C$end,
+                         color = DaAe_A$gid)
+write_delim(DaAe_Links, "DaAe_gene_links.txt", delim = " ", col_names = F)
+```
+
+```{r}
+load("coverages.RData")
+
+Circos_df <-
+  Clustered_All %>% filter(`Read source` == "DaAe" &
+                             `Mapped to` == "DaAe") %>%
+  mutate(consensus = ifelse(consensus >= 4,
+                            4,
+                            ifelse(consensus <= -4, -4,
+                                   consensus))) %>%
+  select(1, 2, 3, 11) %>%
+  na.omit()
+
+write_delim(Circos_df, "DaAe_coverage_scatter.txt", col_names = F)
+
+Circos_df <-
+  Clustered_All %>% filter(`Read source` == "Darmor-bzh" &
+                             `Mapped to` == "Darmor-bzh") %>%
+  mutate(consensus = ifelse(consensus >= 4,
+                            4,
+                            ifelse(consensus <= -4,-4,
+                                   consensus))) %>%
+  select(1, 2, 3, 11) %>%
+  na.omit()
+write_delim(Circos_df, "Darmor_coverage_scatter.txt", col_names = F)
+
+Circos_df <-
+  Clustered_All %>% filter(`Read source` == "Tapidor" &
+                             `Mapped to` == "Tapidor") %>%
+  mutate(consensus = ifelse(consensus >= 4,
+                            4,
+                            ifelse(consensus <= -4, -4,
+                                   consensus))) %>%
+  select(1, 2, 3, 11) %>%
+  na.omit()
+write_delim(Circos_df, "Tapidor_coverage_scatter.txt", col_names = F)
+```
