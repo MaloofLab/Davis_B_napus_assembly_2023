@@ -1,0 +1,126 @@
+---
+title: "Bna_Gene_Indexing"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+### Load in the Third party groupings
+```{r}
+dat <- read_tsv("Third_Party_Gene_Data/BnaGeneindex.v0.txt")
+```
+
+### Will be aligning DaAe genes to ZS11
+```{r}
+headers <- c("query.acc.ver","subject.acc.ver","pct.identity","alignment.length","mismatches","gap.opens","q.start","q.end","s.start","s.end","evalue","bit.score","query.length","subject.length")
+DaAe_vs_ZS11 <- read_table("BlastP/DaAe_vs_ZS11.out.gz", col_names = headers) %>%
+  mutate(query.acc.ver = str_replace(query.acc.ver,"T","G"),
+         subject.acc.ver = str_replace(subject.acc.ver,"T","G"))
+ZS11_vs_DaAe <- read_table("BlastP/ZS11_vs_DaAe.out.gz", col_names = headers) %>%
+  mutate(query.acc.ver = str_replace(query.acc.ver,"T","G"),
+         subject.acc.ver = str_replace(subject.acc.ver,"T","G"))
+```
+### Filter for only ZS11 genes in BnaGeneindex.v0.txt
+```{r}
+DaAe_vs_ZS11 <- DaAe_vs_ZS11 %>%
+  filter(query.acc.ver %in% dat$ZS)
+ZS11_vs_DaAe <- ZS11_vs_DaAe %>%
+  filter(subject.acc.ver %in% dat$ZS)
+```
+
+### Start with A subgenome
+```{r}
+DaAe_vs_ZS11_A <- DaAe_vs_ZS11 %>%
+  filter(str_detect(query.acc.ver,"BnaA") & str_detect(subject.acc.ver,"BnachrA"))
+ZS11_vs_DaAe_A <- ZS11_vs_DaAe %>%
+  filter(str_detect(query.acc.ver,"BnachrA") & str_detect(subject.acc.ver,"BnaA"))
+```
+
+### Filter for best hits
+```{r}
+DaAe_vs_ZS11_A <- DaAe_vs_ZS11_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_vs_DaAe_A <- ZS11_vs_DaAe_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+```
+
+### Merge together
+```{r}
+DaAe_vs_ZS11_A <- inner_join(DaAe_vs_ZS11_A,
+                                  ZS11_vs_DaAe_A,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+```
+
+### Repeat for C
+```{r}
+DaAe_vs_ZS11_C <- DaAe_vs_ZS11 %>%
+  filter(str_detect(query.acc.ver,"BnaC") & str_detect(subject.acc.ver,"BnachrC"))
+ZS11_vs_DaAe_C <- ZS11_vs_DaAe %>%
+  filter(str_detect(query.acc.ver,"BnachrC") & str_detect(subject.acc.ver,"BnaC"))
+DaAe_vs_ZS11_C <- DaAe_vs_ZS11_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_vs_DaAe_C <- ZS11_vs_DaAe_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+DaAe_vs_ZS11_C <- inner_join(DaAe_vs_ZS11_C,
+                                  ZS11_vs_DaAe_C,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+```
+
+### Repeat for Random Scaffolds
+```{r}
+DaAe_vs_ZS11_scafs <- DaAe_vs_ZS11 %>%
+  filter(str_detect(query.acc.ver,"Bnascaffold"),
+         !(subject.acc.ver %in% DaAe_vs_ZS11_A$subject.acc.ver),
+         !(subject.acc.ver %in% DaAe_vs_ZS11_C$subject.acc.ver))
+ZS11_vs_DaAe_scafs <- ZS11_vs_DaAe %>%
+  filter(str_detect(subject.acc.ver, "Bnascaffold"),
+         !(query.acc.ver %in% DaAe_vs_ZS11_A$subject.acc.ver),
+         !(query.acc.ver %in% DaAe_vs_ZS11_C$subject.acc.ver))
+DaAe_vs_ZS11_scafs <- DaAe_vs_ZS11_scafs %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_vs_DaAe_scafs <- ZS11_vs_DaAe_scafs %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+DaAe_vs_ZS11_scafs <- inner_join(DaAe_vs_ZS11_scafs,
+                                  ZS11_vs_DaAe_scafs,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+```
+
+### Combine the results
+```{r}
+Filtered_DaAe_vs_ZS11 <- rbind(DaAe_vs_ZS11_A,
+                               DaAe_vs_ZS11_C,
+                               DaAe_vs_ZS11_scafs)
+new_dat <- left_join(dat,
+                     Filtered_DaAe_vs_ZS11 %>% select(ZS = query.acc.ver,
+                                                      DaAe = subject.acc.ver),
+                     by = "ZS",
+                    ) %>%
+  mutate(DaAe = ifelse(is.na(DaAe), "-", DaAe))
+```
+
+### Save Results
+```{r}
+write_tsv(new_dat, "KIAT_BnaGeneindex.v0.txt")
+```
+
