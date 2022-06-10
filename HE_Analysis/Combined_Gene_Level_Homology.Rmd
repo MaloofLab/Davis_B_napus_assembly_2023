@@ -1,0 +1,112 @@
+---
+title: "Combined_Gene_Level_Homology"
+output: html_document
+date: '2022-06-10'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+## Load locations
+```{r}
+load("DaAe_gene_doublings.RData")
+load("ZS11_gene_doublings.RData")
+load("Darmor-Bzh_V10_gene_doublings.RData")
+load("DaAe_Gene_Positions.RData")
+load("ZS11_Gene_Positions.RData")
+load("Darmor-Bzh_V10_Gene_Positions.RData")
+```
+
+# Find Shared Sites
+```{r}
+Progenitor_Pull <- function(Alignment){
+  combined_name <- Alignment %>%
+  transmute(Progenitor_Pair = paste(Rapa,Oleracea, sep = "_")) %>%
+  pull(Progenitor_Pair)
+  return(combined_name)
+}
+DA_DaAe_Progenitors <- Progenitor_Pull(DA_Combined_DaAe)
+DC_DaAe_Progenitors <- Progenitor_Pull(DC_Combined_DaAe)
+DA_ZS11_Progenitors <- Progenitor_Pull(DA_Combined_ZS11)
+DC_ZS11_Progenitors <- Progenitor_Pull(DC_Combined_ZS11)
+DA_Darmor_Bzh_V10_Progenitors <- Progenitor_Pull(DA_Combined_Darmor_Bzh_V10)
+DC_Darmor_Bzh_V10_Progenitors <- Progenitor_Pull(DC_Combined_Darmor_Bzh_V10)
+```
+
+# Plot
+```{r}
+library(VennDiagram)
+library(RColorBrewer)
+
+Plot3VennDiagram <-
+  function(title = "",
+           setlist = NULL,
+           setnames = c(),
+           filename = "") {
+    myCol <- brewer.pal(3, "Pastel2")
+    venn.diagram(
+      main = title,
+      main.cex = 1.5,
+      main.fontface = "bold",
+      x = setlist,
+      category.names = setnames,
+      filename = filename,
+      output = TRUE,
+      # Output features
+      imagetype = "png" ,
+      height = 1500 ,
+      width = 1500 ,
+      resolution = 300,
+      compression = "lzw",
+      # Circles
+      lwd = 2,
+      lty = 'blank',
+      fill = myCol,
+      # Numbers
+      cex = .8,
+      fontface = "bold",
+      fontfamily = "Arial",
+      # Set names
+      cat.cex = 1,
+      cat.fontface = "bold",
+      cat.default.pos = "outer",
+      cat.fontfamily = "Arial"
+    )
+  }
+
+setnames <- c("DaAe", "ZS11", "Darmor-Bzh_V10")
+Double_A <- list(
+  DaAe = DA_DaAe_Progenitors,
+  ZS11 = DA_ZS11_Progenitors,
+  Darmor_Bzh_V10= DA_Darmor_Bzh_V10_Progenitors
+)
+windowsFonts("Arial" = windowsFont("Arial"))
+Plot3VennDiagram(title = "C to A Conversion",
+                 setlist = Double_A,
+                 setnames = setnames,
+                 filename = "C_to_A_Venndiagram.png")
+
+Double_C <- list(
+  DaAe = DC_DaAe_Progenitors,
+  ZS11 = DC_ZS11_Progenitors,
+  Darmor_Bzh_V10= DC_Darmor_Bzh_V10_Progenitors
+)
+Plot3VennDiagram(title = "A to C Conversion",
+                 setlist = Double_C,
+                 setnames = setnames,
+                 filename = "A_to_C_Venndiagram.png")
+
+# Reverse ratios
+sum(DA_DaAe_Progenitors %in% DC_ZS11_Progenitors)
+sum(DA_DaAe_Progenitors %in% DC_Darmor_Bzh_V10_Progenitors)
+sum(DC_DaAe_Progenitors %in% DA_ZS11_Progenitors)
+sum(DC_DaAe_Progenitors %in% DA_Darmor_Bzh_V10_Progenitors)
+sum(DA_ZS11_Progenitors %in% DC_Darmor_Bzh_V10_Progenitors)
+sum(DC_ZS11_Progenitors %in% DA_Darmor_Bzh_V10_Progenitors)
+```
+

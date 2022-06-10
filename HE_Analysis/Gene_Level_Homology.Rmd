@@ -34,7 +34,7 @@ blastp \
 library(tidyverse)
 headers <- c("query.acc.ver","subject.acc.ver","pct.identity","alignment.length","mismatches","gap.opens","q.start","q.end","s.start","s.end","evalue","bit.score","query.length","subject.length")
 ```
-
+## DaAE
 ```{r}
 # Finding the RBH between each genome/subgenome
 # Find the RBH between B.rapa and B.oleracea
@@ -482,7 +482,7 @@ DC_Combined_DaAe <- Coverage_Combiner(Brapa_and_Boleracea, DC_Pseudo_napus_DaAe,
 ```
 
 ```{r}
-save(DA_Combined_DaAe, DC_Combined_DaAe, file = "gene_doublings.RData")
+save(DA_Combined_DaAe, DC_Combined_DaAe, file = "DaAe_gene_doublings.RData")
 ```
 
 ### Extracting positions of genes
@@ -503,5 +503,338 @@ Position_Extract <- function(Combined_Coverage, Pseudo_napus_Coverage, Napus_Cov
 DA_DaAe_Positions <- Position_Extract(DA_Combined_DaAe, Pseudo_napus_Coverage, DaAe_Coverage)
 DC_DaAe_Positions <- Position_Extract(DC_Combined_DaAe, Pseudo_napus_Coverage, DaAe_Coverage)
 
-save(DA_DaAe_Positions, DC_DaAe_Positions, file = "Gene_Positions.RData")
+save(DA_DaAe_Positions, DC_DaAe_Positions, file = "DaAe_Gene_Positions.RData")
+```
+
+## ZS11
+```{r}
+# Repeat for DaAe_A and Brapa
+# Find the RBH between DaAe_A and Brapa
+Brapa_vs_ZS11 <- read_table("BlastP/Brapa_Z1_V2_vs_ZS11.out.gz", col_names = headers) %>% filter(!grepl("Bnascaffold", query.acc.ver))
+Brapa_vs_ZS11_A <- Brapa_vs_ZS11 %>%
+  filter(grepl("BnaA",query.acc.ver))
+ZS11_vs_Brapa <- read_table("BlastP/ZS11_vs_Brapa_Z1_V2.out.gz", col_names = headers) %>% filter(!grepl("Bnascaffold", subject.acc.ver))
+ZS11_A_vs_Brapa <- ZS11_vs_Brapa %>%
+  filter(grepl("BnaA",subject.acc.ver))
+
+# Filter for best hits
+Brapa_vs_ZS11_A <- Brapa_vs_ZS11_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_A_vs_Brapa <- ZS11_A_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Brapa_and_ZS11_A <- inner_join(Brapa_vs_ZS11_A,
+                                  ZS11_A_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for ZS11_C and Brapa
+# Find the RBH between ZS11_C and Brapa
+Brapa_vs_ZS11_C <- Brapa_vs_ZS11 %>%
+  filter(grepl("BnaC",query.acc.ver))
+ZS11_C_vs_Brapa <- ZS11_vs_Brapa %>%
+  filter(grepl("BnaC",subject.acc.ver))
+
+# Filter for best hits
+Brapa_vs_ZS11_C <- Brapa_vs_ZS11_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_C_vs_Brapa <- ZS11_C_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Brapa_and_ZS11_C <- inner_join(Brapa_vs_ZS11_C,
+                                  ZS11_C_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for ZS11_A and Boleracea
+# Find the RBH between ZS11_A and Boleracea
+Boleracea_vs_ZS11 <- read_table("BlastP/Boleracea_HDEM_vs_ZS11.out.gz", col_names = headers) %>% filter(!grepl("Bnascaffold", query.acc.ver))
+Boleracea_vs_ZS11_A <- Boleracea_vs_ZS11 %>%
+  filter(grepl("BnaA",query.acc.ver))
+ZS11_vs_Boleracea <- read_table("BlastP/ZS11_vs_Boleracea_HDEM.out.gz", col_names = headers) %>% filter(!grepl("Bnascaffold", subject.acc.ver))
+ZS11_A_vs_Boleracea <- ZS11_vs_Boleracea %>%
+  filter(grepl("BnaA",subject.acc.ver))
+
+# Filter for best hits
+Boleracea_vs_ZS11_A <- Boleracea_vs_ZS11_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_A_vs_Boleracea <- ZS11_A_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Boleracea_and_ZS11_A <- inner_join(Boleracea_vs_ZS11_A,
+                                  ZS11_A_vs_Boleracea,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for ZS11_C and Boleracea
+# Find the RBH between ZS11_C and Boleracea
+Boleracea_vs_ZS11_C <- Boleracea_vs_ZS11 %>%
+  filter(grepl("BnaC",query.acc.ver))
+ZS11_C_vs_Boleracea <- ZS11_vs_Boleracea %>%
+  filter(grepl("BnaC",subject.acc.ver))
+
+# Filter for best hits
+Boleracea_vs_ZS11_C <- Boleracea_vs_ZS11_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_C_vs_Boleracea <- ZS11_C_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Boleracea_and_ZS11_C <- inner_join(Boleracea_vs_ZS11_C,
+                                  ZS11_C_vs_Boleracea,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for ZS11_A and ZS11_C
+# Find the RBH between ZS11_A and ZS11_C
+ZS11_A_vs_ZS11_C <- read_table("BlastP/ZS11_A_vs_ZS11_C.out.gz", col_names = headers) %>% filter(!grepl("Bnascaffold", query.acc.ver))
+ZS11_C_vs_ZS11_A <- read_table("BlastP/ZS11_C_vs_ZS11_A.out.gz", col_names = headers) %>% filter(!grepl("Bnascaffold", subject.acc.ver))
+
+# Filter for best hits
+ZS11_A_vs_ZS11_C <- ZS11_A_vs_ZS11_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+ZS11_C_vs_ZS11_A <- ZS11_C_vs_ZS11_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+ZS11_A_and_ZS11_C <- inner_join(ZS11_A_vs_ZS11_C,
+                                  ZS11_C_vs_ZS11_A,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+ZS11_Double_A <- HE_of_A(ArCo = Brapa_and_Boleracea,
+                         ArAn = Brapa_and_ZS11_A,
+                         ArCn = Brapa_and_ZS11_C,
+                         CoCn = Boleracea_and_ZS11_C,
+                         AnCn = ZS11_A_and_ZS11_C,
+                         name = "ZS11")
+
+
+ZS11_Double_C <- HE_of_C(ArCo = Brapa_and_Boleracea,
+                         ArAn = Brapa_and_ZS11_A,
+                         CoAn = Boleracea_and_ZS11_A,
+                         CoCn = Boleracea_and_ZS11_C,
+                         AnCn = ZS11_A_and_ZS11_C,
+                         name = "ZS11")
+
+Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
+ZS11_Coverage <- Coverage_Readin("Coverages/Gene/ZS11_Gene_coverage.tsv")
+
+DA_Pseudo_napus_ZS11 <- DA_Pseudo_napus_Formatter(Brapa_and_Boleracea,
+                                      Pseudo_napus_Coverage,
+                                      Brapa_and_ZS11_A,
+                                      ZS11_Double_A,
+                                      cutoff = 2.5)
+
+
+DC_Pseudo_napus_ZS11 <- DC_Pseudo_napus_Formatter(Brapa_and_Boleracea,
+                                                  Pseudo_napus_Coverage,
+                                                  Boleracea_and_ZS11_C,
+                                                  ZS11_Double_C,
+                                                  cutoff = 2.5)
+
+
+DA_ZS11 <- Double_Pseudo_napus_Formatter(ZS11_Coverage, ZS11_Double_A)
+DC_ZS11 <- Double_Pseudo_napus_Formatter(ZS11_Coverage, ZS11_Double_C)
+
+DA_Combined_ZS11 <- Coverage_Combiner(Brapa_and_Boleracea, DA_Pseudo_napus_ZS11, Brapa_and_ZS11_A, Boleracea_and_ZS11_C, DA_ZS11)
+DC_Combined_ZS11 <- Coverage_Combiner(Brapa_and_Boleracea, DC_Pseudo_napus_ZS11, Brapa_and_ZS11_A, Boleracea_and_ZS11_C, DC_ZS11)
+
+save(DA_Combined_ZS11, DC_Combined_ZS11, file = "ZS11_gene_doublings.RData")
+
+DA_ZS11_Positions <- Position_Extract(DA_Combined_ZS11, Pseudo_napus_Coverage, ZS11_Coverage)
+DC_ZS11_Positions <- Position_Extract(DC_Combined_ZS11, Pseudo_napus_Coverage, ZS11_Coverage)
+
+save(DA_ZS11_Positions, DC_ZS11_Positions, file = "ZS11_Gene_Positions.RData")
+```
+
+## Darmor_Bzh_V10
+```{r}
+# Repeat for DaAe_A and Brapa
+# Find the RBH between DaAe_A and Brapa
+Brapa_vs_Darmor_Bzh_V10 <- read_table("BlastP/Brapa_Z1_V2_vs_Darmor_Bzh_V10.out.gz", col_names = headers) %>% filter(!grepl("scaffold", query.acc.ver))
+Brapa_vs_Darmor_Bzh_V10_A <- Brapa_vs_Darmor_Bzh_V10 %>%
+  filter(grepl("^A",query.acc.ver))
+Darmor_Bzh_V10_vs_Brapa <- read_table("BlastP/Darmor_Bzh_V10_vs_Brapa_Z1_V2.out.gz", col_names = headers) %>% filter(!grepl("scaffold", subject.acc.ver))
+Darmor_Bzh_V10_A_vs_Brapa <- Darmor_Bzh_V10_vs_Brapa %>%
+  filter(grepl("^A",subject.acc.ver))
+
+# Filter for best hits
+Brapa_vs_Darmor_Bzh_V10_A <- Brapa_vs_Darmor_Bzh_V10_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+Darmor_Bzh_V10_A_vs_Brapa <- Darmor_Bzh_V10_A_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Brapa_and_Darmor_Bzh_V10_A <- inner_join(Brapa_vs_Darmor_Bzh_V10_A,
+                                  Darmor_Bzh_V10_A_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for Darmor_Bzh_V10_C and Brapa
+# Find the RBH between Darmor_Bzh_V10_C and Brapa
+Brapa_vs_Darmor_Bzh_V10_C <- Brapa_vs_Darmor_Bzh_V10 %>%
+  filter(grepl("^C",query.acc.ver))
+Darmor_Bzh_V10_C_vs_Brapa <- Darmor_Bzh_V10_vs_Brapa %>%
+  filter(grepl("^C",subject.acc.ver))
+
+# Filter for best hits
+Brapa_vs_Darmor_Bzh_V10_C <- Brapa_vs_Darmor_Bzh_V10_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+Darmor_Bzh_V10_C_vs_Brapa <- Darmor_Bzh_V10_C_vs_Brapa %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Brapa_and_Darmor_Bzh_V10_C <- inner_join(Brapa_vs_Darmor_Bzh_V10_C,
+                                  Darmor_Bzh_V10_C_vs_Brapa,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for Darmor_Bzh_V10_A and Boleracea
+# Find the RBH between Darmor_Bzh_V10_A and Boleracea
+Boleracea_vs_Darmor_Bzh_V10 <- read_table("BlastP/Boleracea_HDEM_vs_Darmor-Bzh_V10.out.gz", col_names = headers) %>% filter(!grepl("scaffold", query.acc.ver))
+Boleracea_vs_Darmor_Bzh_V10_A <- Boleracea_vs_Darmor_Bzh_V10 %>%
+  filter(grepl("^A",query.acc.ver))
+Darmor_Bzh_V10_vs_Boleracea <- read_table("BlastP/Darmor-Bzh_V10_vs_Boleracea_HDEM.out.gz", col_names = headers) %>% filter(!grepl("scaffold", subject.acc.ver))
+Darmor_Bzh_V10_A_vs_Boleracea <- Darmor_Bzh_V10_vs_Boleracea %>%
+  filter(grepl("^A",subject.acc.ver))
+
+# Filter for best hits
+Boleracea_vs_Darmor_Bzh_V10_A <- Boleracea_vs_Darmor_Bzh_V10_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+Darmor_Bzh_V10_A_vs_Boleracea <- Darmor_Bzh_V10_A_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Boleracea_and_Darmor_Bzh_V10_A <- inner_join(Boleracea_vs_Darmor_Bzh_V10_A,
+                                  Darmor_Bzh_V10_A_vs_Boleracea,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for Darmor_Bzh_V10_C and Boleracea
+# Find the RBH between Darmor_Bzh_V10_C and Boleracea
+Boleracea_vs_Darmor_Bzh_V10_C <- Boleracea_vs_Darmor_Bzh_V10 %>%
+  filter(grepl("^C",query.acc.ver))
+Darmor_Bzh_V10_C_vs_Boleracea <- Darmor_Bzh_V10_vs_Boleracea %>%
+  filter(grepl("^C",subject.acc.ver))
+
+# Filter for best hits
+Boleracea_vs_Darmor_Bzh_V10_C <- Boleracea_vs_Darmor_Bzh_V10_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+Darmor_Bzh_V10_C_vs_Boleracea <- Darmor_Bzh_V10_C_vs_Boleracea %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Boleracea_and_Darmor_Bzh_V10_C <- inner_join(Boleracea_vs_Darmor_Bzh_V10_C,
+                                  Darmor_Bzh_V10_C_vs_Boleracea,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+# Repeat for Darmor_Bzh_V10_A and Darmor_Bzh_V10_C
+# Find the RBH between Darmor_Bzh_V10_A and Darmor_Bzh_V10_C
+Darmor_Bzh_V10_A_vs_Darmor_Bzh_V10_C <- read_table("BlastP/Darmor-Bzh_V10_A_vs_Darmor-Bzh_V10_C.out.gz", col_names = headers) %>% filter(!grepl("scaffold", query.acc.ver))
+Darmor_Bzh_V10_C_vs_Darmor_Bzh_V10_A <- read_table("BlastP/Darmor-Bzh_V10_C_vs_Darmor-Bzh_V10_A.out.gz", col_names = headers) %>% filter(!grepl("scaffold", subject.acc.ver))
+
+# Filter for best hits
+Darmor_Bzh_V10_A_vs_Darmor_Bzh_V10_C <- Darmor_Bzh_V10_A_vs_Darmor_Bzh_V10_C %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+Darmor_Bzh_V10_C_vs_Darmor_Bzh_V10_A <- Darmor_Bzh_V10_C_vs_Darmor_Bzh_V10_A %>%
+  group_by(query.acc.ver) %>%
+  slice_max(order_by = bit.score, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Merge together
+Darmor_Bzh_V10_A_and_Darmor_Bzh_V10_C <- inner_join(Darmor_Bzh_V10_A_vs_Darmor_Bzh_V10_C,
+                                  Darmor_Bzh_V10_C_vs_Darmor_Bzh_V10_A,
+                                  by = c("query.acc.ver" = "subject.acc.ver",
+                                         "subject.acc.ver" = "query.acc.ver"))
+
+
+Darmor_Bzh_V10_Double_A <- HE_of_A(ArCo = Brapa_and_Boleracea,
+                         ArAn = Brapa_and_Darmor_Bzh_V10_A,
+                         ArCn = Brapa_and_Darmor_Bzh_V10_C,
+                         CoCn = Boleracea_and_Darmor_Bzh_V10_C,
+                         AnCn = Darmor_Bzh_V10_A_and_Darmor_Bzh_V10_C,
+                         name = "Darmor_Bzh_V10")
+
+
+Darmor_Bzh_V10_Double_C <- HE_of_C(ArCo = Brapa_and_Boleracea,
+                         ArAn = Brapa_and_Darmor_Bzh_V10_A,
+                         CoAn = Boleracea_and_Darmor_Bzh_V10_A,
+                         CoCn = Boleracea_and_Darmor_Bzh_V10_C,
+                         AnCn = Darmor_Bzh_V10_A_and_Darmor_Bzh_V10_C,
+                         name = "Darmor_Bzh_V10")
+
+
+Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
+Darmor_Bzh_V10_Coverage <- Coverage_Readin("Coverages/Gene/Darmor-Bzh_V10_Gene_coverage.tsv")
+
+
+DA_Pseudo_napus_Darmor_Bzh_V10 <- DA_Pseudo_napus_Formatter(Brapa_and_Boleracea,
+                                      Pseudo_napus_Coverage,
+                                      Brapa_and_Darmor_Bzh_V10_A,
+                                      Darmor_Bzh_V10_Double_A,
+                                      cutoff = 2.5)
+
+
+DC_Pseudo_napus_Darmor_Bzh_V10 <- DC_Pseudo_napus_Formatter(Brapa_and_Boleracea,
+                                                  Pseudo_napus_Coverage,
+                                                  Boleracea_and_Darmor_Bzh_V10_C,
+                                                  Darmor_Bzh_V10_Double_C,
+                                                  cutoff = 2.5)
+
+
+DA_Darmor_Bzh_V10 <- Double_Pseudo_napus_Formatter(Darmor_Bzh_V10_Coverage, Darmor_Bzh_V10_Double_A)
+DC_Darmor_Bzh_V10 <- Double_Pseudo_napus_Formatter(Darmor_Bzh_V10_Coverage, Darmor_Bzh_V10_Double_C)
+
+DA_Combined_Darmor_Bzh_V10 <- Coverage_Combiner(Brapa_and_Boleracea, DA_Pseudo_napus_Darmor_Bzh_V10, Brapa_and_Darmor_Bzh_V10_A, Boleracea_and_Darmor_Bzh_V10_C, DA_Darmor_Bzh_V10)
+DC_Combined_Darmor_Bzh_V10 <- Coverage_Combiner(Brapa_and_Boleracea, DC_Pseudo_napus_Darmor_Bzh_V10, Brapa_and_Darmor_Bzh_V10_A, Boleracea_and_Darmor_Bzh_V10_C, DC_Darmor_Bzh_V10)
+
+save(DA_Combined_Darmor_Bzh_V10, DC_Combined_Darmor_Bzh_V10, file = "Darmor-Bzh_V10_gene_doublings.RData")
+
+DA_Darmor_Bzh_V10_Positions <- Position_Extract(DA_Combined_Darmor_Bzh_V10, Pseudo_napus_Coverage, Darmor_Bzh_V10_Coverage)
+DC_Darmor_Bzh_V10_Positions <- Position_Extract(DC_Combined_Darmor_Bzh_V10, Pseudo_napus_Coverage, Darmor_Bzh_V10_Coverage)
+
+save(DA_Darmor_Bzh_V10_Positions, DC_Darmor_Bzh_V10_Positions, file = "Darmor-Bzh_V10_Gene_Positions.RData")
 ```
