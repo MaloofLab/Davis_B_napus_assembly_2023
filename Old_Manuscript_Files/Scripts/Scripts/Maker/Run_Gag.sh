@@ -1,0 +1,1 @@
+python2 gag.py --fasta DaAe.fasta --gff DaAe.gff --out gag_output
