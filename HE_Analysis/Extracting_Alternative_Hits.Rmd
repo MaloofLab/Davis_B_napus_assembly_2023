@@ -1,0 +1,82 @@
+---
+title: "Extracting_Alternative_Hits"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+## On command line, to reduce down to 6 columns
+
+```{bash}
+zcat pseudo_napus_Alternates.tsv.gz | sed 's/MD.*XA:Z:/XA:Z:/' | gzip > Filtered_pseudo_napus_Alternates.tsv.gz
+```
+
+```{r}
+# Load File
+alts <- read_tsv("Alternate_Hits/Filtered_DaAe_Alternates.tsv.gz",
+                 col_names = c("P_Chromosome",
+                               "P_Position",
+                               "P_MapQ",
+                               "P_CIGAR",
+                               "P_NM",
+                               "Alts"))
+gc()
+head(alts)
+```
+
+```{r}
+# Format Data
+alts <- alts %>% mutate(P_NM = as.numeric(str_remove(P_NM, "NM:i:")))
+gc()
+alts <- alts %>% mutate(Alts = str_remove(Alts,"XA:Z:"),
+                        Alts = str_remove(Alts, ";$"))
+gc()
+head(alts)
+```
+
+```{r}
+for(i in 1:5) {
+alts <- alts %>% separate(Alts, c(paste0("Hit_", i), "Alts"),
+                          sep = ";",
+                          fill = "right",
+                          remove = TRUE,
+                          extra = "merge")
+}
+gc()
+alts$Alts <- NULL
+head(alts)
+gc()
+```
+
+```{r}
+for(i in 1:5){
+new_col <- paste0("NM_", i)
+hit_col <- paste0("Hit_", i)
+alts <- alts %>% mutate(!!new_col := as.numeric(str_remove(get(hit_col), ".*,")),
+                        !!hit_col := ifelse(get(new_col) <= P_NM, get(hit_col), NA),
+                        !!new_col := ifelse(get(new_col) <= P_NM, get(new_col), NA))
+}
+gc()
+```
+
+```{r}
+alts <- alts %>% select(starts_with("Hit"))
+alts <- alts %>% pivot_longer(cols = 1:5,
+                              names_to = "Hit",
+                              values_to = "Mapping",
+                              values_drop_na = TRUE) %>%
+                 separate(col = Mapping,
+                          into = c("Chromosome", "Position", "CIGAR", "NM"),
+                          convert = TRUE) %>%
+                 mutate(Position = abs(Position) %>%
+                 select(Chromosome, Position) %>%
+                 arrange(Chromosome, Position)
+
+```
+###
