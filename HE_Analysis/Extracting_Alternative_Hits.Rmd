@@ -13,29 +13,23 @@ library(tidyverse)
 
 ## On command line, to reduce down to 6 columns
 
-```{bash}
-zcat pseudo_napus_Alternates.tsv.gz | sed 's/MD.*XA:Z:/XA:Z:/' | gzip > Filtered_pseudo_napus_Alternates.tsv.gz
+```{bash, eval = F}
+for i in $(ls *.tsv.gz)
+do
+  zcat ${i} |\
+    sed 's/MD.*XA:Z://' |\
+    awk '{print $5"\t"$6}' |\
+    sed 's/NM:i://' |\
+    sed 's/;$//' |\
+    gzip > Filtered_${i}
+done
 ```
 
 ```{r}
 # Load File
-alts <- read_tsv("Alternate_Hits/Filtered_DaAe_Alternates.tsv.gz",
-                 col_names = c("P_Chromosome",
-                               "P_Position",
-                               "P_MapQ",
-                               "P_CIGAR",
-                               "P_NM",
+alts <- read_tsv("Alternate_Hits/Filtered_Boleracea_Alternates.tsv.gz",
+                 col_names = c("P_NM",
                                "Alts"))
-gc()
-head(alts)
-```
-
-```{r}
-# Format Data
-alts <- alts %>% mutate(P_NM = as.numeric(str_remove(P_NM, "NM:i:")))
-gc()
-alts <- alts %>% mutate(Alts = str_remove(Alts,"XA:Z:"),
-                        Alts = str_remove(Alts, ";$"))
 gc()
 head(alts)
 ```
