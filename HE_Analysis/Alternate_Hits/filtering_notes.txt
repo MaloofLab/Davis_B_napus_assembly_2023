@@ -1,0 +1,39 @@
+## On command line, to reduce down to 6 columns
+
+cat pseudo_napus_Alternates.tsv | sed 's/MD.*XA:Z:/XA:Z:/' > temp.tsv
+
+## In R
+library(tidyverse)
+alts <- read_tsv("temp.tsv", col_names = c("P_Chromosome", "P_Position", "P_MapQ", "P_CIGAR", "P_NM", "Alts"))
+alts <- alts %>% mutate(P_NM = as.numeric(str_remove(P_NM, "NM:i:")))
+alts <- alts %>% mutate(Alts = str_remove(Alts,"XA:Z:"),
+                        Alts = str_remove(Alts, ";$"))
+
+for(i in 1:5) {
+alts <- alts %>% separate(Alts, c(paste0("Hit_", i), "Alts"),
+                          sep = ";",
+                          fill = "right",
+                          remove = TRUE,
+                          extra = "merge")
+}
+alts$Alts <- NULL
+
+for(i in 1:5){
+new_col <- paste0("NM_", i)
+hit_col <- paste0("Hit_", i)
+alts <- alts %>% mutate(!!new_col := as.numeric(str_remove(get(hit_col), ".*,")),
+                        !!hit_col := ifelse(get(new_col) <= P_NM, get(hit_col), NA),
+                        !!new_col := ifelse(get(new_col) <= P_NM, get(new_col), NA))
+}
+
+alts <- alts %>% select(starts_with("Hit"))
+alts <- alts %>% pivot_longer(cols = 1:5,
+                              names_to = "Hit",
+                              values_to = "Mapping",
+                              values_drop_na = TRUE) %>%
+                 separate(col = Mapping,
+                          into = c("Chromosome", "Position", "CIGAR", "NM"),
+                          convert = TRUE) %>%
+                 mutate(Position = abs(Position) %>%
+                 select(Chromosome, Position) %>%
+                 arrange(Chromosome, Position)
