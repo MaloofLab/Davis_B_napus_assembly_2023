@@ -122,7 +122,8 @@ Hit_Processor <- function(x, pos) {
     separate(
       col = Mapping,
       into = c("Chromosome", "Position", "CIGAR", "NM"),
-      convert = TRUE
+      convert = TRUE,
+      sep = ","
     ) %>%
     mutate(Position = abs(Position)) %>%
     select(Chromosome, Position) %>%
@@ -141,7 +142,7 @@ write_tsv(alts, "Boleracea_Alternates_sites.tsv.gz")
 ```{r}
 Assemblies <- (list.files("Alternate_Hits", pattern = "^Filtered") %>%
   str_remove(., "Filtered_") %>%
-  str_remove(., "_Alternates.tsv.gz"))[-1]
+  str_remove(., "_Alternates.tsv.gz"))
 
 for(i in Assemblies) {
   alts <-
@@ -150,7 +151,7 @@ for(i in Assemblies) {
       DataFrameCallback$new(Hit_Processor),
       col_names = c("P_NM", "Alts"),
       progress = TRUE,
-      chunk_size = 10000
+      chunk_size = 1000000
     )
   write_tsv(alts,
             paste0("Alternate_Hits/", i, "_Alternates_sites.tsv.gz"))
