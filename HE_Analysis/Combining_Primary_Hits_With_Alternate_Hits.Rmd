@@ -1,0 +1,146 @@
+---
+title: "Combining_Primary_Hits_With_Alternate_Hits"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+## Read in the calculated primary coverage on sequence level
+primary_coverage_columns <- c("Chromosome", "Start", "End", "Reads", "Covered", "Size", "Ratio")
+Primary_Coverage_Readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = primary_coverage_columns,
+                   delim = "\t")
+  return(df)
+}
+
+## Read in the calculated primary coverage on gene level
+gene_coverage_columns <- c("Chromosome","Start","End","GeneId","Score","Strand","Coverage", "Covered", "Size", "Ratio")
+Gene_Coverage_Readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = gene_coverage_columns,
+                   delim = "\t")
+  return(df)
+}
+
+## Read in the calculated alternate coverage
+Alternate_Coverage_Readin <- function(filename){
+  df <- read_delim(filename,
+                   col_names = T,
+                   delim = "\t")
+  return(df)
+}
+```
+
+```{r}
+DaAe_Primary <- Primary_Coverage_Readin("Coverages/Sequence/DaAe_coverage.tsv.gz")
+DaAe_Gene <- Gene_Coverage_Readin("Coverages/Gene/DaAe_Gene_coverage.tsv.gz")
+DaAe_Alt <- Alternate_Coverage_Readin("Alternate_Hits/DaAe_Alternates_sites.tsv.gz")
+```
+
+```{r}
+# Start combining
+# Break it up
+#chroms <- c(paste0("chrA0", 1:9), "chrA10", paste0("chrC0", 1:9))
+chroms <- c(paste0("chrC0", 1:9))
+
+Prime <- data.frame(matrix(ncol = length(colnames(DaAe_Primary))))
+colnames(Prime) <- colnames(DaAe_Primary)
+Gene <- data.frame(matrix(ncol = length(colnames(DaAe_Gene))))
+colnames(Gene) <- colnames(DaAe_Gene)
+
+system.time(for(i in chroms){
+  cat("starting ", i, "\n")
+  prim_chrom <- DaAe_Primary %>% filter(Chromosome == i)
+  gene_chrom <- DaAe_Gene %>% filter(Chromosome == i)
+  alt_chrom <- DaAe_Alt %>% filter(Chromosome == i)
+  for(j in 1:nrow(prim_chrom)){
+    start <- prim_chrom[[j,2]]
+    end <- prim_chrom[[j,3]]
+    alt_count <- alt_chrom %>%
+    filter(Position >= start,
+           Position <= end) %>%
+    nrow()
+    prim_chrom[j,4] <- prim_chrom[j,4] + alt_count
+  }
+  Prime <- rbind(Prime,prim_chrom)
+  
+  for(j in 1:nrow(gene_chrom)){
+    start <- gene_chrom[[j,2]]
+    end <- gene_chrom[[j,3]]
+    alt_count <- alt_chrom %>%
+    filter(Position >= start,
+           Position <= end) %>%
+    nrow()
+    gene_chrom[j,7] <- gene_chrom[j,7] + alt_count
+  }
+  Gene <- rbind(Gene,gene_chrom)
+  cat("finished ", i, "\n")
+}
+)
+```
+
+## Run on the rest of the samples
+
+```{r}
+Assemblies <- list.files("Alternate_Hits", pattern = "^Filtered") %>%
+  str_remove(., "Filtered_") %>%
+  str_remove(., "_Alternates.tsv.gz")
+
+for (k in Assemblies) {
+  # Load it in
+  Primary <- Primary_Coverage_Readin(paste0("Coverages/Sequence/", k, "_coverage.tsv.gz"))
+  Genes <- Gene_Coverage_Readin("Coverages/Gene/", k, "_Gene_coverage.tsv.gz")
+  Alt <- Alternate_Coverage_Readin("Alternate_Hits/", k, "_Alternates_sites.tsv.gz")
+  # Break it up
+  chroms <- unique(Primary$Chromosome)
+  Prime <- data.frame(matrix(ncol = length(colnames(Primary))))
+  colnames(Prime) <- colnames(Primary)
+  Gene <- data.frame(matrix(ncol = length(colnames(Genes))))
+  colnames(Gene) <- colnames(Genes)
+  for (i in chroms) {
+    cat("starting ", i, "\n")
+    prim_chrom <- Primary %>% filter(Chromosome == i)
+    gene_chrom <- Genes %>% filter(Chromosome == i)
+    alt_chrom <- Alt %>% filter(Chromosome == i)
+    for (j in 1:nrow(prim_chrom)) {
+      start <- prim_chrom[[j, 2]]
+      end <- prim_chrom[[j, 3]]
+      alt_count <- alt_chrom %>%
+        filter(Position >= start,
+               Position <= end) %>%
+        nrow()
+      prim_chrom[j, 4] <- prim_chrom[j, 4] + alt_count
+    }
+    
+      Prime <- rbind(Prime, prim_chrom)
+        
+      for (j in 1:nrow(gene_chrom)) {
+        start <- gene_chrom[[j, 2]]
+        end <- gene_chrom[[j, 3]]
+        alt_count <- alt_chrom %>%
+          filter(Position >= start,
+                 Position <= end) %>%
+          nrow()
+        gene_chrom[j, 7] <- gene_chrom[j, 7] + alt_count
+      }
+      
+        Gene <- rbind(Gene, gene_chrom)
+        cat("finished ", i, "\n")
+  }
+  write_tsv(Prime, paste0("Combined_Coverages/Combined_",
+                          k,
+                          "_Coverage.tsv.gz"))
+  write_tsv(Gene, paste0("Combined_Coverages/Combined_",
+                          k,
+                          "_Gene_Coverage.tsv.gz"))
+}
+```
+
