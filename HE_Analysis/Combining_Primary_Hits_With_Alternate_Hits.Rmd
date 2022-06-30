@@ -97,8 +97,8 @@ Assemblies <- list.files("Alternate_Hits", pattern = "^Filtered") %>%
 for (k in Assemblies) {
   # Load it in
   Primary <- Primary_Coverage_Readin(paste0("Coverages/Sequence/", k, "_coverage.tsv.gz"))
-  Genes <- Gene_Coverage_Readin("Coverages/Gene/", k, "_Gene_coverage.tsv.gz")
-  Alt <- Alternate_Coverage_Readin("Alternate_Hits/", k, "_Alternates_sites.tsv.gz")
+  Genes <- Gene_Coverage_Readin(paste0("Coverages/Gene/", k, "_Gene_coverage.tsv.gz"))
+  Alt <- Alternate_Coverage_Readin(paste0("Alternate_Hits/", k, "_Alternates_sites.tsv.gz"))
   # Break it up
   chroms <- unique(Primary$Chromosome)
   Prime <- data.frame(matrix(ncol = length(colnames(Primary))))
