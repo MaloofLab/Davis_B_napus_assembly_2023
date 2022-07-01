@@ -17,7 +17,8 @@ coverage_columns <- c("Chromosome", "Start", "End", "Reads", "Covered", "Size", 
 Coverage_Readin <- function(filename){
   df <- read_delim(filename,
                    col_names = coverage_columns,
-                   delim = "\t") %>%
+                   delim = "\t",
+                   skip = 2) %>%
     mutate(Adjusted_Coverage = round(Reads / Size, 2),
            Position = floor((End + Start) / 2)) %>%
     group_by(Chromosome) %>%
@@ -30,8 +31,8 @@ Coverage_Readin <- function(filename){
   return(df)
 }
 
-Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Sequence/pseudo_napus_coverage.tsv")
-DaAe_Coverage <- Coverage_Readin("Coverages/Sequence/DaAe_coverage.tsv")
+Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_napus_Coverage.tsv.gz")
+DaAe_Coverage <- Coverage_Readin("Combined_Coverages/Combined_DaAe_Coverage.tsv.gz")
 ```
 
 # Format the data a bit
@@ -44,7 +45,6 @@ Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
                              paste0("chr",Chromosome))
   )
 DaAe_Coverage$Assembly <- "DaAe"
-#All_Coverage <- rbind(Pseudo_napus_Coverage, DaAe_Coverage)
 ```
 
 ## Clustering a bit
@@ -109,7 +109,7 @@ for (i in chroms) {
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
                  })
-  ggsave(paste0("Coverage_Plots_20220607/",i,".png"))
+  ggsave(paste0("Coverage_Plots_20220701/",i,".png"))
 }
 ```
 
@@ -125,7 +125,8 @@ coverage_columns <- c("Chromosome", "Start", "End", "Reads", "Covered", "Size", 
 Coverage_Readin <- function(filename){
   df <- read_delim(filename,
                    col_names = coverage_columns,
-                   delim = "\t") %>%
+                   delim = "\t",
+                   skip = 2) %>%
     mutate(Adjusted_Coverage = round(Reads / Size, 2),
            Position = floor((End + Start) / 2)) %>%
     group_by(Chromosome) %>%
@@ -138,10 +139,10 @@ Coverage_Readin <- function(filename){
   return(df)
 }
 
-Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Sequence/pseudo_napus_coverage.tsv")
-DaAe_Coverage <- Coverage_Readin("Coverages/Sequence/DaAe_coverage.tsv")
-ZS11_Coverage <- Coverage_Readin("Coverages/Sequence/ZS11_coverage.tsv")
-Darmor_Bzh_V10_Coverage <- Coverage_Readin("Coverages/Sequence/Darmor-Bzh_V10_coverage.tsv")
+Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_napus_Coverage.tsv.gz")
+DaAe_Coverage <- Coverage_Readin("Combined_Coverages/Combined_DaAe_Coverage.tsv.gz")
+ZS11_Coverage <- Coverage_Readin("Combined_Coverages/Combined_ZS11_Coverage.tsv.gz")
+Darmor_Bzh_V10_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Darmor-Bzh_V10_Coverage.tsv.gz")
 ```
 
 # Format the data a bit
@@ -282,7 +283,7 @@ for (i in chroms) {
                  }) +
     geom_text(data = All_Positions %>% filter(Chromosome == i),
                aes(x = Position, y = Y, label = Shaped))
-  ggsave(paste0("Coverage_Plots_20220610/",i,".png"), width = 10, height = 10)
+  ggsave(paste0("Coverage_Plots_20220701/",i,".png"), width = 10, height = 10)
 }
 
 save(Clustered_All, All_Positions, file = "Coverages_and_Positions.RData")
