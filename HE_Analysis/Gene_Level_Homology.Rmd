@@ -337,8 +337,9 @@ To look at the coverage of the genes listed in the BED files, the trimmed 10X re
 ## Read in the calculated coverages
 Coverage_Readin <- function(filename){
   df <- read_delim(filename,
-                   col_names = c("Chromosome","Start","End","GeneId","Score","Strand","Coverage", "Covered", "Size", "Ratio"),
+                   col_names = T,
                    delim = "\t") %>%
+    filter(!is.na(Chromosome)) %>%
     mutate(Adjusted_Coverage = round(Coverage / Size, 2),
            Position = floor((End + Start) / 2)) %>%
     group_by(Chromosome) %>%
@@ -351,8 +352,8 @@ Coverage_Readin <- function(filename){
 }
 
 
-Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
-DaAe_Coverage <- Coverage_Readin("Coverages/Gene/DaAe_Gene_coverage.tsv")
+Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_napus_Gene_Coverage.tsv.gz")
+DaAe_Coverage <- Coverage_Readin("Combined_Coverages/Combined_DaAe_Gene_Coverage.tsv.gz")
 ```
 
 # Double A in Progenitor genes
@@ -640,8 +641,8 @@ ZS11_Double_C <- HE_of_C(ArCo = Brapa_and_Boleracea,
                          AnCn = ZS11_A_and_ZS11_C,
                          name = "ZS11")
 
-Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
-ZS11_Coverage <- Coverage_Readin("Coverages/Gene/ZS11_Gene_coverage.tsv")
+Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_napus_Gene_Coverage.tsv.gz")
+ZS11_Coverage <- Coverage_Readin("Combined_Coverages/Combined_ZS11_Gene_Coverage.tsv.gz")
 
 DA_Pseudo_napus_ZS11 <- DA_Pseudo_napus_Formatter(Brapa_and_Boleracea,
                                       Pseudo_napus_Coverage,
@@ -675,10 +676,10 @@ save(DA_ZS11_Positions, DC_ZS11_Positions, file = "ZS11_Gene_Positions.RData")
 ```{r}
 # Repeat for DaAe_A and Brapa
 # Find the RBH between DaAe_A and Brapa
-Brapa_vs_Darmor_Bzh_V10 <- read_table("BlastP/Brapa_Z1_V2_vs_Darmor_Bzh_V10.out.gz", col_names = headers) %>% filter(!grepl("scaffold", query.acc.ver))
+Brapa_vs_Darmor_Bzh_V10 <- read_table("BlastP/Brapa_Z1_V2_vs_Darmor-Bzh_V10.out.gz", col_names = headers) %>% filter(!grepl("scaffold", query.acc.ver))
 Brapa_vs_Darmor_Bzh_V10_A <- Brapa_vs_Darmor_Bzh_V10 %>%
   filter(grepl("^A",query.acc.ver))
-Darmor_Bzh_V10_vs_Brapa <- read_table("BlastP/Darmor_Bzh_V10_vs_Brapa_Z1_V2.out.gz", col_names = headers) %>% filter(!grepl("scaffold", subject.acc.ver))
+Darmor_Bzh_V10_vs_Brapa <- read_table("BlastP/Darmor-Bzh_V10_vs_Brapa_Z1_V2.out.gz", col_names = headers) %>% filter(!grepl("scaffold", subject.acc.ver))
 Darmor_Bzh_V10_A_vs_Brapa <- Darmor_Bzh_V10_vs_Brapa %>%
   filter(grepl("^A",subject.acc.ver))
 
@@ -807,8 +808,8 @@ Darmor_Bzh_V10_Double_C <- HE_of_C(ArCo = Brapa_and_Boleracea,
                          name = "Darmor_Bzh_V10")
 
 
-Pseudo_napus_Coverage <- Coverage_Readin("Coverages/Gene/pseudo_napus_Gene_coverage.tsv")
-Darmor_Bzh_V10_Coverage <- Coverage_Readin("Coverages/Gene/Darmor-Bzh_V10_Gene_coverage.tsv")
+Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_napus_Gene_Coverage.tsv.gz")
+Darmor_Bzh_V10_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Darmor-Bzh_V10_Gene_Coverage.tsv.gz")
 
 
 DA_Pseudo_napus_Darmor_Bzh_V10 <- DA_Pseudo_napus_Formatter(Brapa_and_Boleracea,
