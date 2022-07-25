@@ -68,11 +68,11 @@ Plot3VennDiagram <-
       lty = 'blank',
       fill = myCol,
       # Numbers
-      cex = .8,
+      cex = 1.25,
       fontface = "bold",
       fontfamily = "Arial",
       # Set names
-      cat.cex = 1,
+      cat.cex = 1.5,
       cat.fontface = "bold",
       cat.default.pos = "outer",
       cat.fontfamily = "Arial"
