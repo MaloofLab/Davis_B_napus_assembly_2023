@@ -1,0 +1,57 @@
+---
+title: "Unigene_Analysis"
+output: html_document
+date: "2022-07-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{bash, eval = F}
+#blast/2.12.0+
+blastn \
+  -db Sequences/${assm}.cds.fa \
+  -query Sequences/BrasEX1s.unigene.public.cds.fasta \
+  -evalue 1e-6 \
+  -num_threads 10 \
+  -outfmt '7 std stitle' \
+  > Alignments/${assm}_Unigene.out
+
+blastn \
+  -query Sequences/${assm}.cds.fa \
+  -db Sequences/BrasEX1s.unigene.public.cds.fasta \
+  -evalue 1e-6 \
+  -num_threads 10 \
+  -outfmt '7 std stitle' \
+  > Alignments/Unigene_${assm}.out
+```
+
+# Read in blastn alignments
+```{r}
+headers <- c("query.acc.ver","subject.acc.ver","pct.identity","alignment.length","mismatches","gap.opens","q.start","q.end","s.start","s.end","evalue","bit.score","subject.title")
+
+DaAe_Unigene <- read_tsv("Alignments/DaAe_Unigene.out.gz",
+                         comment = "#",
+                         col_names = headers)
+
+Darmorv4.1_Unigene <- read_tsv("Alignments/Darmor-bzh_v4.1_Unigene.out.gz",
+                         comment = "#",
+                         col_names = headers)
+
+Darmorv10_Unigene <- read_tsv("Alignments/Darmor-bzh_v10_Unigene.out.gz",
+                         comment = "#",
+                         col_names = headers)
+```
+
+# Load names of all Unigenes
+```{r}
+# Gene names from BrasEX1s.unigene.public.cds.fasta
+unigenes <- read_tsv("Alignments/BrasEX1s.unigene.public.cds.genenames.txt.gz",
+                     col_names = "GeneID")
+```
+
