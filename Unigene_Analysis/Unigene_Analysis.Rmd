@@ -55,3 +55,14 @@ unigenes <- read_tsv("Alignments/BrasEX1s.unigene.public.cds.genenames.txt.gz",
                      col_names = "GeneID")
 ```
 
+```{r}
+# How many Unigenes have a match in each
+length(unique(DaAe_Unigene$query.acc.ver))
+length(unique(Darmorv10_Unigene$query.acc.ver))
+length(unique(Darmorv4.1_Unigene$query.acc.ver))
+```
+
+## Old
+133,127 sequences, 117,447 (88.22%) were present in both genomes, 1,300 (0.98%) were present in only Da-Ae, 1,198 (0.90%) were present in only Darmor-bzh, and 13,182 (9.90%) were missing from both genomes. 
+117,447 
+
