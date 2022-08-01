@@ -113,6 +113,8 @@ for (i in chroms) {
 }
 ```
 
+#######
+#######
 # Add in more napus genomes
 
 ```{r}
@@ -287,5 +289,79 @@ for (i in chroms) {
 }
 
 save(Clustered_All, All_Positions, file = "Coverages_and_Positions.RData")
+```
+
+################
+# Explore areas where gene and sequence level HE overlap
+
+```{r}
+library(tidyverse)
+load("Coverages_and_Positions.RData")
+chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
+
+chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
+for (i in chroms) {
+  Clustered_All %>% filter(Chromosome == i) %>%
+    mutate(Consensus = ifelse(Consensus >= 4,
+                                          4,
+                                          ifelse(Consensus <= -4,
+                                                 -4,
+                                                 Consensus))) %>%
+    ggplot(aes(x = Position, y = Consensus)) +
+    geom_point(aes(colour = cut(Consensus, c(-Inf, -1, 1, Inf)))) +
+    scale_color_manual(name = "Consensus",
+                     values = c("(-Inf,-1]" = "red",
+                                  "(-1,1]" = "black",
+                                  "(1, Inf]" = "blue"),
+                     labels = c("<= -1", "-1 < Consensus <= 1", "> 1")) +
+    ggtitle(i) +
+    geom_hline(yintercept = 1, color="black") +
+    geom_hline(yintercept = 0, color="black") +
+    geom_hline(yintercept = -1, color="black") +
+    facet_wrap(~Assembly,
+               ncol = 2,
+               labeller = function (labels) {
+                 labels <- lapply(labels, as.character)
+                 labels[[1]] <- paste("Assembly:", labels[[1]])
+                 a <-  do.call(paste,c(labels, list(sep = "\n")))
+                 list(gsub("_","",a))
+                 }) +
+    geom_text(data = All_Positions %>% filter(Chromosome == i),
+               aes(x = Position, y = Y, label = Shaped))
+  ggsave(paste0("Coverage_Plots_20220801/",i,".png"), width = 10, height = 10)
+}
+
+```
+
+# Get weird with it
+```{r}
+chroms <- c(paste0("chrA0", 1:9), "chrA10", paste0("chrC0", 1:9))
+for (i in chroms) {
+  Clustered_All %>% filter(Chromosome == i) %>%
+    mutate(Consensus = ifelse(Consensus >= 4,
+                              4,
+                              ifelse(Consensus <= -4,-4,
+                                     Consensus))) %>%
+    ggplot(aes(x = Position, y = Consensus)) +
+    geom_point(aes(colour = Assembly)) +
+    ggtitle(i) +
+    geom_hline(yintercept = 1, color = "black") +
+    geom_hline(yintercept = 0, color = "black") +
+    geom_hline(yintercept = -1, color = "black") +
+    geom_text(
+      data = All_Positions %>% filter(Chromosome == i),
+      aes(
+        x = Position,
+        y = Y,
+        label = Shaped,
+        color = Assembly
+      )
+    )
+  ggsave(
+    paste0("Combined_Coverage_Plots_20220801/", i, ".png"),
+    width = 10,
+    height = 10
+  )
+}
 ```
 
