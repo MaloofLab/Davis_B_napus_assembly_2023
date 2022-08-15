@@ -1,0 +1,195 @@
+---
+title: "Unigene_Analysis"
+output: html_document
+date: "2022-07-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(goseq)
+library(rtracklayer)
+library(GenomicRanges)
+library(Biostrings)
+```
+
+```{bash, eval = F}
+#blast/2.12.0+
+blastn \
+  -db Sequences/${assm}.fa \
+  -query Sequences/BrasEX1s.unigene.public.cds.fasta \
+  -evalue 1e-6 \
+  -num_threads 10 \
+  -outfmt '6 std stitle' \
+  > Alignments/${assm}_Unigene.out
+```
+
+# Read in blastn alignments
+```{r}
+headers <- c("query.acc.ver","subject.acc.ver","pct.identity","alignment.length","mismatches","gap.opens","q.start","q.end","s.start","s.end","evalue","bit.score","subject.title")
+
+DaAe_Unigene <- read_tsv("Genome_Alignments/DaAe_Unigene.out.gz",
+                         col_names = headers)
+
+
+Darmorv10_Unigene <- read_tsv("Genome_Alignments/Darmor-bzh_v10_Unigene.out.gz",
+                         col_names = headers)
+```
+
+# Load names of all Unigenes
+```{r}
+# Gene names from BrasEX1s.unigene.public.cds.fasta
+unigenes <- read_tsv("Alignments/BrasEX1s.unigene.public.cds.genenames.txt.gz",
+                     col_names = "GeneID")
+```
+
+```{r}
+# How many Unigenes have a match in each
+length(unique(DaAe_Unigene$query.acc.ver))
+length(unique(Darmorv10_Unigene$query.acc.ver))
+```
+# Filter down and look
+```{r}
+Filtered_DaAe_Unigene <- DaAe_Unigene %>%
+  filter(pct.identity >= 90)
+Filtered_Darmorv10_Unigene <- Darmorv10_Unigene %>%
+  filter(pct.identity >= 90)
+```
+
+# Pull gene hits
+```{r}
+DaAe_Genes <- unique(Filtered_DaAe_Unigene$query.acc.ver)
+Darmorv10_Genes <- unique(Filtered_Darmorv10_Unigene$query.acc.ver)
+```
+
+# Get totals
+```{r}
+length(DaAe_Genes)
+length(Darmorv10_Genes)
+```
+
+# Compare all 3
+```{r}
+Combined <- c(DaAe_Genes,Darmorv10_Genes)
+counts <- plyr::count(Combined)
+sum(counts$freq == 2)
+sum(counts$freq == 2)/133127
+```
+# Pairwise
+```{r}
+#DaAe vs Darmor v10
+Combined <- c(DaAe_Genes,Darmorv10_Genes)
+counts <- plyr::count(Combined)
+sum(counts$freq == 2)
+sum(counts$freq == 2)/133127
+```
+
+# Not in any
+```{r}
+Combined <- c(DaAe_Genes,Darmorv10_Genes)
+Missing <- unigenes %>%
+  filter(!(GeneID %in% Combined))
+nrow(Missing)
+nrow(Missing)/133127
+```
+# Gather Go Terms
+```{r}
+Unigene_Lengths <- read_tsv("Alignments/BrasEX1s.unigene.public.cds.fasta.fai") %>%
+  select(GeneID = 1, Length = 2)
+Athal2Uni <- read_tsv("Alignments/BrasEx1s.unigene_v_at.1e-5.tophit.txt") %>% mutate(AtID = str_remove(AtID, "\\.[1-9]+$")) %>%
+  select(1,2)
+AthalGO <- read_tsv("Alignments/ATH_GO_GOSLIM.txt.gz",
+                    comment = "!",
+                    col_names = F) %>%
+  select(AtID = 1, GO = 6) %>%
+  group_by(AtID) %>%
+  summarize(GO = paste(GO, collapse = ","))
+UniGO <- Athal2Uni %>%
+  left_join(AthalGO, by = "AtID") %>%
+  select(GeneID = 1, GO)
+```
+
+# Look for overexpression
+```{r}
+#we need to reduce the gene.length data to only contain entries for those genes in our missing set. We also need this as a vector
+gene.lengths.vector <- Unigene_Lengths$Length[Unigene_Lengths$GeneID %in% unigenes$GeneID]
+names(gene.lengths.vector) <- Unigene_Lengths$GeneID[Unigene_Lengths$GeneID %in% unigenes$GeneID]
+head(gene.lengths.vector)
+expressed.genes.match <- unigenes[unigenes$GeneID %in% names(gene.lengths.vector),]
+
+
+go.list <- strsplit(UniGO$GO,split=",")
+names(go.list) <- UniGO$GeneID
+head(go.list)
+
+
+missed <- expressed.genes.match$GeneID %in% Missing$GeneID
+names(missed) <- expressed.genes.match$GeneID
+head(missed)
+
+missed <- as.numeric(missed) #convert to 0s and 1s
+head(missed)
+sum(missed) # number of missing genes
+
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result <- nullp(DEgenes = missed, bias.data = gene.lengths.vector)
+
+#calculate p-values for each GO term
+rownames(nullp.result) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out <- goseq(pwf = nullp.result,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out[GO.out$over_represented_pvalue < 0.05,]
+
+write.table(GO.out[GO.out$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="Alignments/Missing_All_GO_terms.txt", quote = FALSE,col.names = FALSE)
+```
+
+## In DaAe or Darmor-bzhV10 but not in both
+
+```{r}
+Missing_Darmor <- DaAe_Genes[!(DaAe_Genes %in% Darmorv10_Genes)]
+Missing_DaAe <- Darmorv10_Genes[!(Darmorv10_Genes %in% DaAe_Genes)]
+Combined <- c(Missing_Darmor,Missing_DaAe)
+Missing <- unigenes %>%
+  filter((GeneID %in% Combined))
+nrow(Missing)
+nrow(Missing)/133127
+```
+
+# Look for overexpression
+```{r}
+#we need to reduce the gene.length data to only contain entries for those genes in our missing set. We also need this as a vector
+gene.lengths.vector <- Unigene_Lengths$Length[Unigene_Lengths$GeneID %in% unigenes$GeneID]
+names(gene.lengths.vector) <- Unigene_Lengths$GeneID[Unigene_Lengths$GeneID %in% unigenes$GeneID]
+head(gene.lengths.vector)
+expressed.genes.match <- unigenes[unigenes$GeneID %in% names(gene.lengths.vector),]
+
+
+go.list <- strsplit(UniGO$GO,split=",")
+names(go.list) <- UniGO$GeneID
+head(go.list)
+
+
+missed <- expressed.genes.match$GeneID %in% Missing$GeneID
+names(missed) <- expressed.genes.match$GeneID
+head(missed)
+
+missed <- as.numeric(missed) #convert to 0s and 1s
+head(missed)
+sum(missed) # number of missing genes
+
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result <- nullp(DEgenes = missed, bias.data = gene.lengths.vector)
+
+#calculate p-values for each GO term
+rownames(nullp.result) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out <- goseq(pwf = nullp.result,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out[GO.out$over_represented_pvalue < 0.05,]
+
+write.table(GO.out[GO.out$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="Alignments/Missing_Either_GO_terms.txt", quote = FALSE,col.names = FALSE)
+```

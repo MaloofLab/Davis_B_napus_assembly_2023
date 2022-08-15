@@ -298,8 +298,6 @@ save(Clustered_All, All_Positions, file = "Coverages_and_Positions.RData")
 library(tidyverse)
 load("Coverages_and_Positions.RData")
 chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
-
-chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
 for (i in chroms) {
   Clustered_All %>% filter(Chromosome == i) %>%
     mutate(Consensus = ifelse(Consensus >= 4,
