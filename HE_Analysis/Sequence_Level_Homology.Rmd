@@ -323,10 +323,10 @@ for (i in chroms) {
                  labels[[1]] <- paste("Assembly:", labels[[1]])
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
-                 }) +
-    geom_text(data = All_Positions %>% filter(Chromosome == i),
-               aes(x = Position, y = Y, label = Shaped))
-  ggsave(paste0("Coverage_Plots_20220801/",i,".png"), width = 10, height = 10)
+                 }) #+
+    #geom_text(data = All_Positions %>% filter(Chromosome == i),
+               #aes(x = Position, y = Y, label = Shaped))
+  ggsave(paste0("Coverage_Plots_20220817/",i,".png"), width = 10, height = 10)
 }
 
 ```
@@ -356,7 +356,211 @@ for (i in chroms) {
       )
     )
   ggsave(
-    paste0("Combined_Coverage_Plots_20220801/", i, ".png"),
+    paste0("Combined_Coverage_Plots_20220817/", i, ".png"),
+    width = 10,
+    height = 10
+  )
+}
+```
+
+```{r}
+# Want regions greater than 1 std deviation in coverage
+Filtered_Clustered_All<- Clustered_All #%>%
+  #filter(Consensus <= -1 | Consensus >= 1)
+
+# Want overlap of genes and sequence regions
+DaAe_Seq <- Filtered_Clustered_All %>%
+  filter(Assembly == "DaAe")
+DaAe_Gene <- All_Positions %>%
+  filter(Assembly == "DaAe")
+
+Filtered_DaAe_Gene <- data.frame(matrix(ncol = ncol(DaAe_Gene), nrow = 0))
+colnames(Filtered_DaAe_Gene) <- colnames(DaAe_Gene)
+Filtered_DaAe_Seq <- data.frame(matrix(ncol = ncol(DaAe_Seq), nrow = 0))
+colnames(Filtered_DaAe_Seq) <- colnames(DaAe_Seq)
+
+# Get the genes in the regions
+for(i in 1:nrow(DaAe_Gene)){
+  chrom <- DaAe_Gene[[i,1]]
+  pos <- DaAe_Gene[[i,2]]
+  temp <- DaAe_Seq %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] <= pos & temp[[j,3]] >= pos){
+      Filtered_DaAe_Gene <- rbind(Filtered_DaAe_Gene, DaAe_Gene[i,])
+      break
+    }
+  }
+}
+
+# Get the regions the genes are in
+for(i in 1:nrow(DaAe_Seq)){
+  chrom <- DaAe_Seq[[i,1]]
+  start <- DaAe_Seq[[i,2]]
+  end <- DaAe_Seq[[i,3]]
+  temp <- Filtered_DaAe_Gene %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] >= start & temp[[j,2]] <= end){
+      Filtered_DaAe_Seq <- rbind(Filtered_DaAe_Seq, DaAe_Seq[i,])
+      break
+    }
+  }
+}
+
+# Repeat for the other 3. This could be done a whole lot cleaner
+# Want overlap of genes and sequence regions
+ZS11_Seq <- Filtered_Clustered_All %>%
+  filter(Assembly == "ZS11")
+ZS11_Gene <- All_Positions %>%
+  filter(Assembly == "ZS11")
+
+Filtered_ZS11_Gene <- data.frame(matrix(ncol = ncol(ZS11_Gene), nrow = 0))
+colnames(Filtered_ZS11_Gene) <- colnames(ZS11_Gene)
+Filtered_ZS11_Seq <- data.frame(matrix(ncol = ncol(ZS11_Seq), nrow = 0))
+colnames(Filtered_ZS11_Seq) <- colnames(ZS11_Seq)
+
+# Get the genes in the regions
+for(i in 1:nrow(ZS11_Gene)){
+  chrom <- ZS11_Gene[[i,1]]
+  pos <- ZS11_Gene[[i,2]]
+  temp <- ZS11_Seq %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] <= pos & temp[[j,3]] >= pos){
+      Filtered_ZS11_Gene <- rbind(Filtered_ZS11_Gene, ZS11_Gene[i,])
+      break
+    }
+  }
+}
+
+# Get the regions the genes are in
+for(i in 1:nrow(ZS11_Seq)){
+  chrom <- ZS11_Seq[[i,1]]
+  start <- ZS11_Seq[[i,2]]
+  end <- ZS11_Seq[[i,3]]
+  temp <- Filtered_ZS11_Gene %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] >= start & temp[[j,2]] <= end){
+      Filtered_ZS11_Seq <- rbind(Filtered_ZS11_Seq, ZS11_Seq[i,])
+      break
+    }
+  }
+}
+
+# Want overlap of genes and sequence regions
+Darmor_Bzh_V10_Seq <- Filtered_Clustered_All %>%
+  filter(Assembly == "Darmor-Bzh_V10")
+Darmor_Bzh_V10_Gene <- All_Positions %>%
+  filter(Assembly == "Darmor-Bzh_V10")
+
+Filtered_Darmor_Bzh_V10_Gene <- data.frame(matrix(ncol = ncol(Darmor_Bzh_V10_Gene), nrow = 0))
+colnames(Filtered_Darmor_Bzh_V10_Gene) <- colnames(Darmor_Bzh_V10_Gene)
+Filtered_Darmor_Bzh_V10_Seq <- data.frame(matrix(ncol = ncol(Darmor_Bzh_V10_Seq), nrow = 0))
+colnames(Filtered_Darmor_Bzh_V10_Seq) <- colnames(Darmor_Bzh_V10_Seq)
+
+# Get the genes in the regions
+for(i in 1:nrow(Darmor_Bzh_V10_Gene)){
+  chrom <- Darmor_Bzh_V10_Gene[[i,1]]
+  pos <- Darmor_Bzh_V10_Gene[[i,2]]
+  temp <- Darmor_Bzh_V10_Seq %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] <= pos & temp[[j,3]] >= pos){
+      Filtered_Darmor_Bzh_V10_Gene <- rbind(Filtered_Darmor_Bzh_V10_Gene, Darmor_Bzh_V10_Gene[i,])
+      break
+    }
+  }
+}
+
+# Get the regions the genes are in
+for(i in 1:nrow(Darmor_Bzh_V10_Seq)){
+  chrom <- Darmor_Bzh_V10_Seq[[i,1]]
+  start <- Darmor_Bzh_V10_Seq[[i,2]]
+  end <- Darmor_Bzh_V10_Seq[[i,3]]
+  temp <- Filtered_Darmor_Bzh_V10_Gene %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] >= start & temp[[j,2]] <= end){
+      Filtered_Darmor_Bzh_V10_Seq <- rbind(Filtered_Darmor_Bzh_V10_Seq, Darmor_Bzh_V10_Seq[i,])
+      break
+    }
+  }
+}
+
+# Want overlap of genes and sequence regions
+Pseudo_napus_Seq <- Filtered_Clustered_All %>%
+  filter(Assembly == "Pseudo_napus")
+Pseudo_napus_Gene <- All_Positions %>%
+  filter(Assembly == "Pseudo_napus")
+
+Filtered_Pseudo_napus_Gene <- data.frame(matrix(ncol = ncol(Pseudo_napus_Gene), nrow = 0))
+colnames(Filtered_Pseudo_napus_Gene) <- colnames(Pseudo_napus_Gene)
+Filtered_Pseudo_napus_Seq <- data.frame(matrix(ncol = ncol(Pseudo_napus_Seq), nrow = 0))
+colnames(Filtered_Pseudo_napus_Seq) <- colnames(Pseudo_napus_Seq)
+
+# Get the genes in the regions
+for(i in 1:nrow(Pseudo_napus_Gene)){
+  chrom <- Pseudo_napus_Gene[[i,1]]
+  pos <- Pseudo_napus_Gene[[i,2]]
+  temp <- Pseudo_napus_Seq %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] <= pos & temp[[j,3]] >= pos){
+      Filtered_Pseudo_napus_Gene <- rbind(Filtered_Pseudo_napus_Gene, Pseudo_napus_Gene[i,])
+      break
+    }
+  }
+}
+
+# Get the regions the genes are in
+for(i in 1:nrow(Pseudo_napus_Seq)){
+  chrom <- Pseudo_napus_Seq[[i,1]]
+  start <- Pseudo_napus_Seq[[i,2]]
+  end <- Pseudo_napus_Seq[[i,3]]
+  temp <- Filtered_Pseudo_napus_Gene %>% filter(Chromosome == chrom)
+  if(nrow(temp) == 0) next
+  for(j in 1:nrow(temp)){
+    if(temp[[j,2]] >= start & temp[[j,2]] <= end){
+      Filtered_Pseudo_napus_Seq <- rbind(Filtered_Pseudo_napus_Seq, Pseudo_napus_Seq[i,])
+      break
+    }
+  }
+}
+
+# Combine together
+Combined_Gene <- rbind(Filtered_DaAe_Gene, Filtered_Darmor_Bzh_V10_Gene,
+                       Filtered_ZS11_Gene, Filtered_Pseudo_napus_Gene)
+
+Combined_Seq <- rbind(Filtered_DaAe_Seq, Filtered_Darmor_Bzh_V10_Seq,
+                       Filtered_ZS11_Seq, Filtered_Pseudo_napus_Seq)
+
+# Plot
+chroms <- c(paste0("chrA0", 1:9), "chrA10", paste0("chrC0", 1:9))
+for (i in chroms) {
+  Combined_Seq %>% filter(Chromosome == i) %>%
+    mutate(Consensus = ifelse(Consensus >= 4,
+                              4,
+                              ifelse(Consensus <= -4,-4,
+                                     Consensus))) %>%
+    ggplot(aes(x = Position, y = Consensus)) +
+    geom_point(aes(colour = Assembly)) +
+    ggtitle(i) +
+    geom_hline(yintercept = 1, color = "black") +
+    geom_hline(yintercept = 0, color = "black") +
+    geom_hline(yintercept = -1, color = "black") +
+    geom_text(
+      data = Combined_Gene %>% filter(Chromosome == i),
+      aes(
+        x = Position,
+        y = Y,
+        label = Shaped,
+        color = Assembly
+      )
+    )
+  ggsave(
+    paste0("Combined_Coverage_Plots_20220817/", i, ".png"),
     width = 10,
     height = 10
   )

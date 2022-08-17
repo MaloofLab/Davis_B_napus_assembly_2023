@@ -174,7 +174,7 @@ stuff$uniqueness <- as.numeric( as.character(stuff$uniqueness) );
 stuff$dispensability <- as.numeric( as.character(stuff$dispensability) );
 
 # by default, outputs to a PDF file
-pdf( file="revigo_treemap.pdf", width=16, height=9 ) # width and height are in inches
+pdf( file="all_revigo_treemap.pdf", width=16, height=9 ) # width and height are in inches
 
 # check the tmPlot command documentation for all possible parameters - there are a lot more
 treemap(
@@ -183,7 +183,8 @@ treemap(
   vSize = "value",
   type = "categorical",
   vColor = "representative",
-  title = "Revigo TreeMap",
+  #title = "Revigo TreeMap",
+  fontsize.labels =c (0,10),
   inflate.labels = FALSE,      # set this to TRUE for space-filling group labels - good for posters
   lowerbound.cex.labels = 0,   # try to draw as many labels as possible (still, some small squares may not get a label)
   #bg.labels = "#CCCCCCAA",   # define background color of group labels
