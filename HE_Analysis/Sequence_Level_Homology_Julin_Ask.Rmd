@@ -21,7 +21,7 @@ Coverage_Readin <- function(filename){
                    skip = 2) %>%
     mutate(Adjusted_Coverage = round(Reads / Size, 2),
            Position = floor((End + Start) / 2)) %>%
-    mutate(Genome_Average = mean(Adjusted_Coverage, na.rm = T),
+    mutate(Genome_Average = median(Adjusted_Coverage, na.rm = T),
            Genome_SD = sd(Adjusted_Coverage, na.rm = T),
            Relative_Coverage = round(Adjusted_Coverage / Genome_Average, 2),
            Relative_Coverage = ifelse(Relative_Coverage >= 10, NA, Relative_Coverage),
@@ -53,7 +53,7 @@ Clustered_Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_Pseudo_napus_Coverage)-10)){
-  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)],1)
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Pseudo_napus_Coverage$Consensus[i-1]
@@ -66,7 +66,7 @@ Clustered_DaAe_Coverage <- DaAe_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
-  Neighbors <- round(Clustered_DaAe_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- round(Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)],1)
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_DaAe_Coverage$Consensus[i-1]
@@ -83,22 +83,18 @@ Clustered_All$Assembly <- factor(Clustered_All$Assembly, levels = c("Pseudo_napu
 chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
 for (i in chroms) {
   Clustered_All %>% filter(Chromosome == i) %>%
-    mutate(Consensus = ifelse(Consensus >= 4,
-                                          4,
-                                          ifelse(Consensus <= -4,
-                                                 -4,
-                                                 Consensus))) %>%
+    mutate(Consensus = ifelse(Consensus >= 4.5, 4.5, Consensus)) %>%
     ggplot(aes(x = Position, y = Consensus)) +
-    geom_point(aes(colour = cut(Consensus, c(-Inf, -1, 1, Inf)))) +
+    geom_point(aes(colour = cut(Consensus, c(-Inf, 0.6, 1.4, Inf)))) +
     scale_color_manual(name = "Consensus",
-                     values = c("(-Inf,-1]" = "red",
-                                  "(-1,1]" = "black",
-                                  "(1, Inf]" = "blue"),
-                     labels = c("<= -1", "-1 < Consensus <= 1", "> 1")) +
+                     values = c("(-Inf,0.6]" = "red",
+                                  "(0.6,1.4]" = "black",
+                                  "(1.4, Inf]" = "blue"),
+                     labels = c("<= 0.6", "0.6 < Consensus <= 1.4", "> 1.4")) +
     ggtitle(i) +
+    geom_hline(yintercept = 2, color="black") +
     geom_hline(yintercept = 1, color="black") +
-    geom_hline(yintercept = 0, color="black") +
-    geom_hline(yintercept = -1, color="black") +
+    geom_hline(yintercept = .5, color="black") +
     facet_wrap(~Assembly,
                ncol = 2,
                labeller = function (labels) {
@@ -107,7 +103,7 @@ for (i in chroms) {
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
                  })
-  ggsave(paste0("Coverage_Plots_20220927/",i,".png"))
+  ggsave(paste0("Coverage_Plots_20220929/",i,".png"))
 }
 ```
 
@@ -149,7 +145,7 @@ Clustered_Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_Pseudo_napus_Coverage)-10)){
-  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)],1)
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Pseudo_napus_Coverage$Consensus[i-1]
@@ -168,7 +164,7 @@ Clustered_Darmor_Bzh_V10_Coverage <- Darmor_Bzh_V10_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
-  Neighbors <- round(Clustered_DaAe_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- round(Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)],1)
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_DaAe_Coverage$Consensus[i-1]
@@ -176,7 +172,7 @@ for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
 }
 
 for(i in 11:(nrow(Clustered_ZS11_Coverage)-10)){
-  Neighbors <- round(Clustered_ZS11_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- round(Clustered_ZS11_Coverage$Relative_Coverage[(i-10):(i+10)],1)
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_ZS11_Coverage$Consensus[i-1]
@@ -184,7 +180,7 @@ for(i in 11:(nrow(Clustered_ZS11_Coverage)-10)){
 }
 
 for(i in 11:(nrow(Clustered_Darmor_Bzh_V10_Coverage)-10)){
-  Neighbors <- round(Clustered_Darmor_Bzh_V10_Coverage$Std_Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- round(Clustered_Darmor_Bzh_V10_Coverage$Relative_Coverage[(i-10):(i+10)],1)
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Darmor_Bzh_V10_Coverage$Consensus[i-1]
@@ -209,8 +205,8 @@ name_fix <- function(positions, assembly_name = "", doubled = "A"){
                                str_replace(Chromosome,"C", "C0"),
                                Chromosome),
            Chromosome = paste0("chr",Chromosome),
-           Y = ifelse(grepl(doubled,Chromosome), 3.5, -3.5),
-           Shaped = ifelse(Y == 3.5, "<", ">"),
+           Y = ifelse(grepl(doubled,Chromosome), 4.5, -.5),
+           Shaped = ifelse(Y == 4.5, "<", ">"),
            Assembly = ifelse(Assembly == "Napus", assembly_name, Assembly)) %>%
     select(Chromosome, Position, Y, Assembly, Shaped)
   return(df)
@@ -233,22 +229,18 @@ All_Positions <- rbind(DA_DaAe_Positions, DA_ZS11_Positions, DA_Darmor_Bzh_V10_P
 chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
 for (i in chroms) {
   Clustered_All %>% filter(Chromosome == i) %>%
-    mutate(Consensus = ifelse(Consensus >= 4,
-                                          4,
-                                          ifelse(Consensus <= -4,
-                                                 -4,
-                                                 Consensus))) %>%
+    mutate(Consensus = ifelse(Consensus >= 4.5, 4.5, Consensus)) %>%
     ggplot(aes(x = Position, y = Consensus)) +
-    geom_point(aes(colour = cut(Consensus, c(-Inf, -1, 1, Inf)))) +
+    geom_point(aes(colour = cut(Consensus, c(-Inf, 0.6, 1.4, Inf)))) +
     scale_color_manual(name = "Consensus",
-                     values = c("(-Inf,-1]" = "red",
-                                  "(-1,1]" = "black",
-                                  "(1, Inf]" = "blue"),
-                     labels = c("<= -1", "-1 < Consensus <= 1", "> 1")) +
+                     values = c("(-Inf,0.6]" = "red",
+                                  "(0.6,1.4]" = "black",
+                                  "(1.4, Inf]" = "blue"),
+                     labels = c("<= 0.6", "0.6 < Consensus <= 1.4", "> 1.4")) +
     ggtitle(i) +
+    geom_hline(yintercept = 2, color="black") +
     geom_hline(yintercept = 1, color="black") +
-    geom_hline(yintercept = 0, color="black") +
-    geom_hline(yintercept = -1, color="black") +
+    geom_hline(yintercept = .5, color="black") +
     facet_wrap(~Assembly,
                ncol = 2,
                labeller = function (labels) {
@@ -259,10 +251,10 @@ for (i in chroms) {
                  }) +
     geom_text(data = All_Positions %>% filter(Chromosome == i),
                aes(x = Position, y = Y, label = Shaped))
-  ggsave(paste0("Coverage_Plots_20220927/",i,".png"), width = 10, height = 10)
+  ggsave(paste0("Coverage_Plots_20220929/",i,".png"), width = 10, height = 10)
 }
 
-save(Clustered_All, All_Positions, file = "Julin_Coverages_and_Positions.RData")
+save(Clustered_All, All_Positions, file = "Julin_Coverages_and_Positions_median.RData")
 ```
 
 ################
@@ -300,7 +292,7 @@ for (i in chroms) {
                  }) #+
     #geom_text(data = All_Positions %>% filter(Chromosome == i),
                #aes(x = Position, y = Y, label = Shaped))
-  ggsave(paste0("Coverage_Plots_20220927/",i,".png"), width = 10, height = 10)
+  ggsave(paste0("Coverage_Plots_20220929/",i,".png"), width = 10, height = 10)
 }
 
 ```
@@ -330,7 +322,7 @@ for (i in chroms) {
       )
     )
   ggsave(
-    paste0("Combined_Coverage_Plots_20220927/", i, ".png"),
+    paste0("Combined_Coverage_Plots_20220929/", i, ".png"),
     width = 10,
     height = 10
   )
@@ -534,7 +526,7 @@ for (i in chroms) {
       )
     )
   ggsave(
-    paste0("Test_Combined_Coverage_Plots_20220927/", i, ".png"),
+    paste0("Test_Combined_Coverage_Plots_20220929/", i, ".png"),
     width = 10,
     height = 10
   )
