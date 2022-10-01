@@ -21,7 +21,7 @@ Coverage_Readin <- function(filename){
                    skip = 2) %>%
     mutate(Adjusted_Coverage = round(Reads / Size, 2),
            Position = floor((End + Start) / 2)) %>%
-    mutate(Genome_Average = median(Adjusted_Coverage, na.rm = T),
+    mutate(Genome_Average = median(ifelse(Adjusted_Coverage>4,NA,Adjusted_Coverage), na.rm = T),
            Genome_SD = sd(Adjusted_Coverage, na.rm = T),
            Relative_Coverage = round(Adjusted_Coverage / Genome_Average, 2),
            Relative_Coverage = ifelse(Relative_Coverage >= 10, NA, Relative_Coverage),
@@ -92,7 +92,7 @@ for (i in chroms) {
                                   "(1.4, Inf]" = "blue"),
                      labels = c("<= 0.6", "0.6 < Consensus <= 1.4", "> 1.4")) +
     ggtitle(i) +
-    geom_hline(yintercept = 2, color="black") +
+    geom_hline(yintercept = 1.5, color="black") +
     geom_hline(yintercept = 1, color="black") +
     geom_hline(yintercept = .5, color="black") +
     facet_wrap(~Assembly,
@@ -238,7 +238,7 @@ for (i in chroms) {
                                   "(1.4, Inf]" = "blue"),
                      labels = c("<= 0.6", "0.6 < Consensus <= 1.4", "> 1.4")) +
     ggtitle(i) +
-    geom_hline(yintercept = 2, color="black") +
+    geom_hline(yintercept = 1.5, color="black") +
     geom_hline(yintercept = 1, color="black") +
     geom_hline(yintercept = .5, color="black") +
     facet_wrap(~Assembly,
