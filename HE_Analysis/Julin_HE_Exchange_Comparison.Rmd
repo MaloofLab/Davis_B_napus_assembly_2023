@@ -1,0 +1,199 @@
+---
+title: "Julin HE Exchange comparison"
+author: "Julin Maloof"
+date: "2022-10-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Idea: Run nucmer on each assembly vs Ancestral in silico.  The do comparison of total exchanged regions and also regions in common.
+
+For each assembly, the nucmer scripts were
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --partition=production # partition to submit to
+#SBATCH --job-name="Nucmer" # Job name
+#SBATCH --array=1-9
+#SBATCH --nodes=1 # single node, anything more than 1 will not run
+#SBATCH --ntasks=10 # equivalent to cpus, stick to around 20 max on gc64, or gc128 nodes
+#SBATCH --mem=20000 # in MB, memory pool all cores, default is 2GB per cpu
+#SBATCH --time=1-00:00:00  # expected time of completion in hours, minutes, seconds, default 1-day
+#SBATCH --output=Logs/arrayJob_%A_%a.out # File to which STDOUT will be written
+#SBATCH --error=Logs/arrayJob_%A_%a.err # File to which STDERR will be written
+#SBATCH --mail-user=jnmaloof@ucdavis.edu
+#SBATCH --mail-type=ALL
+
+# This will be run once for a single process
+
+/bin/hostname
+
+start=$(date +%s)
+
+## Load required modules
+module load mummer/4.0.0rc1
+export gnuplot=/share/malooflab/Packages/gnuplot-5.2.4/bin/gnuplot
+
+## Identify each array run
+
+echo "My SLURM_ARRAY_TASK_ID: " $SLURM_ARRAY_TASK_ID
+A1=$(sed "${SLURM_ARRAY_TASK_ID}q;d" Comparison_list_Julin.txt)
+
+# Run program
+mkdir ${A1}_vs_Ancestral
+cd ${A1}_vs_Ancestral
+nucmer \
+  --threads 10 \
+  --prefix ${A1}_vs_Ancestral \
+  ../../Assemblies/${A1}.fa \
+  ../../Assemblies/Ancestral.fa
+
+mummerplot \
+ --terminal png \
+ --size large \
+ --prefix ${A1}_vs_Ancestral \
+ --fat \
+${A1}_vs_Ancestral.delta
+
+# Run stats
+
+end=$(date +%s)
+runtime=$((end-start))
+echo $runtime seconds to completion
+```
+
+and
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --partition=production # partition to submit to
+#SBATCH --job-name="Nucmer-filter" # Job name
+#SBATCH --array=1-9
+#SBATCH --nodes=1 # single node, anything more than 1 will not run
+#SBATCH --ntasks=1 # equivalent to cpus, stick to around 20 max on gc64, or gc128 nodes
+#SBATCH --mem=8000 # in MB, memory pool all cores, default is 2GB per cpu
+#SBATCH --time=1-00:00:00  # expected time of completion in hours, minutes, seconds, default 1-day
+#SBATCH --output=Logs/arrayJob_%A_%a.out # File to which STDOUT will be written
+#SBATCH --error=Logs/arrayJob_%A_%a.err # File to which STDERR will be written
+#SBATCH --mail-user=jnmaloof@ucdavis.edu
+#SBATCH --mail-type=ALL
+
+# This will be run once for a single process
+
+/bin/hostname
+
+start=$(date +%s)
+
+## Load required modules
+module load mummer/4.0.0rc1
+
+## Identify each array run
+
+echo "My SLURM_ARRAY_TASK_ID: " $SLURM_ARRAY_TASK_ID
+A1=$(sed "${SLURM_ARRAY_TASK_ID}q;d" Comparison_list_Julin.txt)
+
+# Run program
+cd ${A1}_vs_Ancestral
+
+delta-filter -1 ${A1}_vs_Ancestral.delta > ${A1}_vs_Ancestral-1.filter
+
+show-coords ${A1}_vs_Ancestral-1.filter > ${A1}_vs_Ancestral-1.show-coords
+
+# Run stats
+
+end=$(date +%s)
+runtime=$((end-start))
+echo $runtime seconds to completion
+```
+
+```{r}
+library(tidyverse)
+library(ggbio)
+library(GenomicRanges)
+```
+
+
+## Set up Ancestral chromosomes
+
+```{r}
+Anc_lengths <- read_tsv("../Assemblies/pseudo_napus_chrom_lengths.txt", col_names = c("chrom", "length")) %>%
+  mutate(chrom=str_c("Anc-", chrom)) %>%
+    mutate(grangeinput =str_c(chrom,":1-",length))
+
+Anc_chroms <- GRanges(Anc_lengths$grangeinput)
+seqlengths(Anc_chroms) <- Anc_lengths %>% pull(length) 
+
+
+Br_chroms <- Anc_chroms[str_detect(seqnames(seqinfo(Anc_chroms)), "Anc-A")]
+seqlevels(Br_chroms) <- str_subset(seqlevels(Br_chroms), "Anc-A") #drop unused levels
+
+Bo_chroms <- Anc_chroms[str_detect(seqnames(seqinfo(Anc_chroms)), "Anc-C")]
+seqlevels(Bo_chroms) <- str_subset(seqlevels(Bo_chroms), "Anc-C")
+```
+
+### Get the Br vs Bo Comparison
+
+```{r}
+colnames <- unlist(strsplit("ref.start ref.end q.start q.end ref.len q.len pct.id ref.name q.name", split=" "))
+
+Br_vs_Bo <- read_lines("../HE_Analysis/Brapa_vs_Boleracea/Brapa_vs_Boleracea-1.show-coords.gz", skip=5)
+system.time(Br_vs_Bo <- Br_vs_Bo %>% str_replace_all("\\||\\t", " ") %>%
+              str_trim() %>%
+              tibble(data=.) %>% 
+              separate(data, into=colnames, sep=" +", convert=TRUE) 
+) #system.time
+```
+
+Reformat chromosome names
+```{r}
+Br_vs_Bo <- Br_vs_Bo %>%
+  mutate(ref.name=str_c("Anc-", ref.name),
+         q.name=str_c("Anc-",q.name)) %>%
+  rowwise() %>%
+  mutate(q.start.new=min(q.start, q.end),
+         q.end=max(q.start, q.end),
+         q.start=q.start.new) %>%
+  select(-q.start.new)
+
+head(Br_vs_Bo)
+```
+Take a look:
+```{r}
+Br_vs_Bo %>% ggplot(aes(x=ref.len)) +
+  geom_histogram() +
+  scale_x_log10()
+
+Br_vs_Bo %>% ggplot(aes(x=pct.id)) +
+  geom_histogram()
+```
+Filter it
+
+```{r}
+Br_vs_Bo.filter <- Br_vs_Bo %>% filter(pct.id >= 85, ref.len>=1000)
+```
+
+Make a Br_vs_Bo Granges that has both genomes on the left hand side.  These are "Trusted" regions where we "know" that there is a 1:1 correspondence between the two assemblies.
+```{r}
+Anc_trusted_gr <- c(with(Br_vs_Bo.filter,
+                       GRanges(seqinfo=seqinfo(Anc_chroms),
+                               seqnames = ref.name,
+                               ranges = IRanges(start=ref.start, end=ref.end))),
+                  with(Br_vs_Bo.filter,
+                       GRanges(seqinfo=seqinfo(Anc_chroms),
+                               seqnames = q.name,
+                               ranges = IRanges(start=q.start, end=q.end))))
+
+```
+
+## Loop through assemblies
+
+For each assembly we want to load the Nucmer file, filter based on HE, %ID, length, and whether it overlaps with a trusted ancestral region.
+
+```{r}
+comparisons <- dir(pattern="_vs_Ancestral", include.dirs = TRUE)
+comparisons
+```
+

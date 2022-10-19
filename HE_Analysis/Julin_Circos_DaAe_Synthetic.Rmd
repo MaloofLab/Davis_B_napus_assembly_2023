@@ -1,0 +1,265 @@
+---
+title: "Julin Circos DaAe Synthetic"
+output: html_document
+---
+
+Try to make a circos-type plot showing rearrangements between DaAe and in silico
+
+Will try having 38 chromosomes (keep sep chromosomes for DaAe and in silico)
+
+mummer filtering, etc
+```{bash, eval=FALSE}
+module load mummer/4.0.0rc1
+
+delta-filter DaAe_vs_Ancestral.delta -r > DaAe_vs_Ancestral.filter-r
+show-coords DaAe_vs_Ancestral.filter-r > DaAe_vs_Ancestral.filter-r.show-coords
+gzip DaAe_vs_Ancestral.filter-r.show-coords
+
+delta-filter DaAe_vs_Ancestral.delta -q > DaAe_vs_Ancestral.filter-q
+show-coords DaAe_vs_Ancestral.filter-q > DaAe_vs_Ancestral.filter-q.show-coords
+gzip DaAe_vs_Ancestral.filter-q.show-coords
+
+delta-filter DaAe_vs_Ancestral.delta -1 -i 80 -l 100 > DaAe_vs_Ancestral.filter-1
+show-coords DaAe_vs_Ancestral.filter-1 > DaAe_vs_Ancestral.filter-1.show-coords
+gzip DaAe_vs_Ancestral.filter-1.show-coords
+
+
+```
+
+
+```{r}
+library(tidyverse)
+library(ggbio)
+library(GenomicRanges)
+```
+
+## Define Chromosomes
+
+```{r}
+DaAelengths <- read_tsv("../Assemblies/DaAe_chrom_lengths.txt", col_names = c("chrom", "length")) %>%
+  mutate(chrom=str_c("DaAe-",chrom))
+
+pnlengths <- read_tsv("../Assemblies/pseudo_napus_chrom_lengths.txt", col_names = c("chrom", "length")) %>%
+  mutate(chrom=str_c("Anc-", chrom))
+
+combined_lengths <- bind_rows(DaAelengths, pnlengths) %>%
+  mutate(chrom=str_remove(chrom,"chr")) %>%
+  mutate(grangeinput =str_c(chrom,":1-",length))
+
+combined_lengths
+```
+
+
+```{r}
+
+chroms <- GRanges(combined_lengths$grangeinput)
+seqlengths(chroms) <- combined_lengths %>% pull(length) 
+chroms
+```
+
+```{r, fig.width=9, fig.height=9}
+p <- ggbio() +
+  circle(chroms, geom="ideo", fill="skyblue", radius=40) +
+  circle(chroms, geom = "text", aes(label = seqnames), size=4,radius=44) 
+p
+```
+
+## get links
+
+```{r}
+colnames <- unlist(strsplit("ref.start ref.end q.start q.end ref.len q.len pct.id ref.name q.name", split=" "))
+links <- read_lines("../HE_Analysis/DaAe_vs_Ancestral/DaAe_vs_Ancestral.filter-1.show-coords.gz", skip = 5)
+system.time(links <- links %>% str_replace_all("\\||\\t", " ") %>%
+              str_trim() %>%
+              tibble(data=.) %>% 
+              separate(data, into=colnames, sep=" +", convert=TRUE) 
+) #system.time
+```
+
+```{r}
+head(links)
+```
+extract subgenome info and reformat chromosome names
+```{r}
+links <- links %>%
+  mutate(
+    ref.subg = str_extract(ref.name, "A|C"),
+    q.subg = str_extract(q.name, "A|C"),
+    ref.name=str_replace(ref.name, "chr", "DaAe-"),
+    q.name=str_c("Anc-",q.name)) %>%
+  rowwise() %>%
+  mutate(q.start.new=min(q.start, q.end),
+         q.end=max(q.start, q.end),
+         q.start=q.start.new) %>%
+  select(-q.start.new)
+
+head(links)
+```
+subset to exchanges
+```{r}
+links.filter <- links %>% filter(ref.subg!=q.subg)
+```
+
+```{r}
+links.filter %>% ggplot(aes(x=ref.len)) +
+  geom_histogram() +
+  scale_x_log10()
+
+links.filter %>% ggplot(aes(x=pct.id)) +
+  geom_histogram()
+```
+
+```{r}
+links.plot <- links.filter %>%
+  filter(pct.id >=98, ref.len >= 1000)
+
+#links98 <- links98[1:1000,]
+
+linksgr <- with(links.plot, GRanges(seqinfo=seqinfo(chroms),
+                                    seqnames = ref.name,
+                                    ranges = IRanges(start=ref.start, end=ref.end),
+                                    to.GR = GRanges(seqinfo=seqinfo(chroms),
+                                                    seqnames = q.name,
+                                                    ranges = IRanges(start=q.start, end=q.end))))
+linksgr
+```
+
+```{r, fig.height=9, fig.width=9}
+p + circle(linksgr, geom="link", linked.to = "to.GR", radius=38, alpha=0.1)
+```
+
+
+
+## Filter by Brapa and Boleracea homology
+
+To try to clean this up some more, I ran nucmer and Brapa vs Boleracea and then filtered using the -1 option.  I want to use this to only keep regions that are present in both ancestral genome assemblies.
+
+### Set up the chromosomses
+
+```{r}
+Br_chroms <- chroms[str_detect(seqnames(seqinfo(chroms)), "Anc-A")]
+seqlevels(Br_chroms) <- str_subset(seqlevels(Br_chroms), "Anc-A") #drop unused levels
+
+Bo_chroms <- chroms[str_detect(seqnames(seqinfo(chroms)), "Anc-C")]
+seqlevels(Bo_chroms) <- str_subset(seqlevels(Bo_chroms), "Anc-C")
+
+suppressWarnings(Anc_chroms <- c(Br_chroms, Bo_chroms))
+```
+
+### Get the Br vs Bo Comparison
+
+```{r}
+Br_vs_Bo <- read_lines("../HE_Analysis/Brapa_vs_Boleracea/Brapa_vs_Boleracea-1.show-coords.gz", skip=5)
+system.time(Br_vs_Bo <- Br_vs_Bo %>% str_replace_all("\\||\\t", " ") %>%
+              str_trim() %>%
+              tibble(data=.) %>% 
+              separate(data, into=colnames, sep=" +", convert=TRUE) 
+) #system.time
+```
+
+Reformat chromosome names
+```{r}
+Br_vs_Bo <- Br_vs_Bo %>%
+  mutate(ref.name=str_c("Anc-", ref.name),
+         q.name=str_c("Anc-",q.name)) %>%
+  rowwise() %>%
+  mutate(q.start.new=min(q.start, q.end),
+         q.end=max(q.start, q.end),
+         q.start=q.start.new) %>%
+  select(-q.start.new)
+
+head(Br_vs_Bo)
+```
+Take a look:
+```{r}
+Br_vs_Bo %>% ggplot(aes(x=ref.len)) +
+  geom_histogram() +
+  scale_x_log10()
+
+Br_vs_Bo %>% ggplot(aes(x=pct.id)) +
+  geom_histogram()
+```
+
+```{r}
+Br_vs_Bo.filter <- Br_vs_Bo %>% filter(pct.id >= 85, ref.len>=1000)
+```
+
+
+Make a Granges object for plotting
+
+```{r}
+Br_vs_Bo.pl <- Br_vs_Bo.filter %>%
+  filter(ref.len>5000) %>%
+  rowwise() %>%
+  mutate(q.start.new=min(q.start, q.end),
+         q.end=max(q.start, q.end),
+         q.start=q.start.new) %>%
+  select(-q.start.new)
+
+BrBogr.pl <- with(Br_vs_Bo.pl, GRanges(seqinfo=seqinfo(Anc_chroms),
+                                       seqnames = ref.name,
+                                       ranges = IRanges(start=ref.start, end=ref.end),
+                                       to.GR = GRanges(seqinfo=seqinfo(Anc_chroms),
+                                                       seqnames = q.name,
+                                                       ranges = IRanges(start=q.start, end=q.end))))
+BrBogr.pl
+```
+```{r}
+pa <- ggbio() +
+  circle(Anc_chroms, geom="ideo", fill="skyblue", radius=40) +
+  circle(Anc_chroms, geom = "text", aes(label = seqnames), size=2.5,radius=44) 
+pa
+```
+
+```{r}
+pa + circle(BrBogr.pl, geom="link", linked.to = "to.GR", radius=38, alpha=0.1)
+
+```
+## Now try filtering the DaAe vs Ancestral results
+
+Make a Br_vs_Bo Granges that has both genomes on the left hand side
+```{r}
+BrBoGrSelect <- c(with(Br_vs_Bo.filter,
+                       GRanges(seqinfo=seqinfo(Anc_chroms),
+                               seqnames = ref.name,
+                               ranges = IRanges(start=ref.start, end=ref.end))),
+                  with(Br_vs_Bo.filter,
+                       GRanges(seqinfo=seqinfo(Anc_chroms),
+                               seqnames = q.name,
+                               ranges = IRanges(start=q.start, end=q.end))))
+
+```
+
+
+I need to have the outer Granges be the Ancestral chromosome, so
+```{r}
+linksgr2 <- with(links.filter, GRanges(seqinfo=seqinfo(chroms),
+                                       seqnames = q.name,
+                                       ranges = IRanges(start=q.start, end=q.end),
+                                       to.GR = GRanges(seqinfo=seqinfo(chroms),
+                                                       seqnames = ref.name,
+                                                       ranges = IRanges(start=ref.start,
+                                                                        end=ref.end)),
+                                       pct.id = pct.id,
+                                       ref.len = ref.len
+))
+linksgr2
+```
+
+```{r}
+linksgr.good <- subsetByOverlaps(linksgr2, BrBoGrSelect)
+linksgr.good
+```
+
+```{r}
+linksgr.good %>% ggplot(aes(x=pct.id)) + geom_histogram()
+linksgr.good %>% ggplot(aes(x=ref.len)) + geom_histogram() + scale_x_log10()
+```
+
+
+
+```{r}
+p + circle(linksgr.good[linksgr.good$pct.id>=90 & linksgr.good$ref.len>500],
+           geom="link", linked.to = "to.GR", radius=38, alpha=0.2)
+```
+
