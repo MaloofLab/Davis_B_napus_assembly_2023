@@ -46,16 +46,16 @@ A1=$(sed "${SLURM_ARRAY_TASK_ID}q;d" Comparison_list_Julin.txt)
 mkdir ${A1}_vs_Ancestral
 cd ${A1}_vs_Ancestral
 nucmer \
-  --threads 10 \
-  --prefix ${A1}_vs_Ancestral \
-  ../../Assemblies/${A1}.fa \
-  ../../Assemblies/Ancestral.fa
+--threads 10 \
+--prefix ${A1}_vs_Ancestral \
+../../Assemblies/${A1}.fa \
+../../Assemblies/Ancestral.fa
 
 mummerplot \
- --terminal png \
- --size large \
- --prefix ${A1}_vs_Ancestral \
- --fat \
+--terminal png \
+--size large \
+--prefix ${A1}_vs_Ancestral \
+--fat \
 ${A1}_vs_Ancestral.delta
 
 # Run stats
@@ -113,15 +113,32 @@ echo $runtime seconds to completion
 library(tidyverse)
 library(ggbio)
 library(GenomicRanges)
+library(Biostrings)
 ```
 
+## generate chromosome lengths
 
+## Calculate chrom lengths
+
+```{bash, eval=FALSE}
+# on cluster
+cd /share/malooflab/John/KIAT_Revisions/Nucmer/Assemblies
+module load kentutils
+
+for f in $(ls *.fa)
+do
+echo $f
+newf=$(basename ${f} .fa)
+faSize -detailed -tab ${f} > ${newf}_chrom_lengths.txt
+done
+
+```
 ## Set up Ancestral chromosomes
 
 ```{r}
 Anc_lengths <- read_tsv("../Assemblies/pseudo_napus_chrom_lengths.txt", col_names = c("chrom", "length")) %>%
   mutate(chrom=str_c("Anc-", chrom)) %>%
-    mutate(grangeinput =str_c(chrom,":1-",length))
+  mutate(grangeinput =str_c(chrom,":1-",length))
 
 Anc_chroms <- GRanges(Anc_lengths$grangeinput)
 seqlengths(Anc_chroms) <- Anc_lengths %>% pull(length) 
@@ -178,13 +195,13 @@ Br_vs_Bo.filter <- Br_vs_Bo %>% filter(pct.id >= 85, ref.len>=1000)
 Make a Br_vs_Bo Granges that has both genomes on the left hand side.  These are "Trusted" regions where we "know" that there is a 1:1 correspondence between the two assemblies.
 ```{r}
 Anc_trusted_gr <- c(with(Br_vs_Bo.filter,
-                       GRanges(seqinfo=seqinfo(Anc_chroms),
-                               seqnames = ref.name,
-                               ranges = IRanges(start=ref.start, end=ref.end))),
-                  with(Br_vs_Bo.filter,
-                       GRanges(seqinfo=seqinfo(Anc_chroms),
-                               seqnames = q.name,
-                               ranges = IRanges(start=q.start, end=q.end))))
+                         GRanges(seqinfo=seqinfo(Anc_chroms),
+                                 seqnames = ref.name,
+                                 ranges = IRanges(start=ref.start, end=ref.end))),
+                    with(Br_vs_Bo.filter,
+                         GRanges(seqinfo=seqinfo(Anc_chroms),
+                                 seqnames = q.name,
+                                 ranges = IRanges(start=q.start, end=q.end))))
 
 ```
 
@@ -193,7 +210,231 @@ Anc_trusted_gr <- c(with(Br_vs_Bo.filter,
 For each assembly we want to load the Nucmer file, filter based on HE, %ID, length, and whether it overlaps with a trusted ancestral region.
 
 ```{r}
-comparisons <- dir(pattern="_vs_Ancestral", include.dirs = TRUE)
+comparisons <- tibble(directory=dir(pattern="_vs_Ancestral", include.dirs = TRUE),
+                      assembly=str_remove(directory, "_vs_Ancestral"))
 comparisons
+```
+
+```{r}
+colnames <- unlist(strsplit("ref.start ref.end q.start q.end ref.len q.len pct.id ref.name q.name", split=" "))
+
+get_links <- function(directory) { # function to read in and format nucmer comparison info
+  links <- read_lines(file.path(directory,str_c(directory,"-1.show-coords.gz")), skip = 5)
+  links <- links %>% str_replace_all("\\||\\t", " ") %>%
+    str_trim() %>%
+    tibble(data=.) %>% 
+    separate(data, into=colnames, sep=" +", convert=TRUE) 
+  
+  #extract subgenome info and reformat chromosome names
+  links <- links %>%
+    mutate(
+      ref.subg = str_replace(ref.name, ".*(A|C)[0-9]{1,2}$", "\\1"),
+      q.subg =  str_replace(q.name, ".*(A|C)[0-9]{1,2}$", "\\1"),
+      ref.name=str_replace(ref.name, "chr", "DaAe-"),
+      q.name=str_c("Anc-",q.name)) %>%
+    rowwise() %>%
+    mutate(q.start.new=min(q.start, q.end),
+           q.end=max(q.start, q.end),
+           q.start=q.start.new) %>%
+    select(-q.start.new)
+  
+  links <- links %>% filter(ref.subg!=q.subg,
+                            pct.id > 90,
+                            ref.len > 100)
+  return(links)
+}
+
+#Function to convert links to Genomics Ranges
+links_to_gr <- function(links) { 
+  linksgr <- with(links, GRanges(seqinfo=seqinfo(Anc_chroms),
+                                 seqnames = q.name, #query is ancestral, 
+                                 ranges = IRanges(start=q.start, end=q.end),
+                                 to.GR = GRanges(seqnames = ref.name,
+                                                 ranges = IRanges(start=ref.start,
+                                                                  end=ref.end)),
+                                 pct.id = pct.id,
+                                 ref.len = ref.len
+  ))
+  linksgr <- GenomicRanges::intersect(Anc_trusted_gr, linksgr, ignore.strand=TRUE)
+  linksgr
+}
+```
+
+```{r}
+system.time(
+  comparisons <- comparisons %>% 
+    mutate(links=map(directory, get_links))
+)
+```
+
+```{r}
+comparisons <- comparisons %>%
+  mutate(linksgr = map(links, links_to_gr))
+```
+
+```{r}
+comparisons$linksgr[[2]]
+```
+## Quantify number of bases in HE
+
+```{r}
+comparisons <- comparisons %>%
+  mutate(HEsequence_total  = map_int(linksgr, ~ sum(width(.x)))) 
+```
+
+```{r}
+HE_summary <- comparisons %>%
+  mutate(chrom_lengths = map(assembly, ~ read_tsv(file=str_c("../Assemblies/", .x, "_chrom_lengths.txt"),
+                                                  col_names = c("chromosome", "length"),
+                                                  show_col_types = FALSE)),
+         assembly_length = map_dbl(chrom_lengths, ~ sum(.x$length)),
+         HE_percent = round(HEsequence_total/assembly_length * 100, 3),
+         `HE_total (MB)` = round(HEsequence_total/10^6, 2))
+
+HE_summary %>% select(assembly, `HE_total (MB)`, HE_percent)
+```
+
+## Regions common to all:
+
+```{r}
+HEcommon.gr <- comparisons$linksgr[[1]]
+for(i in 2:nrow(comparisons)) {
+  HEcommon.gr <- GenomicRanges::intersect(HEcommon.gr, comparisons$linksgr[[i]])
+}
+
+HEcommon.gr
+
+sum(width(HEcommon.gr))
+```
+
+Is this more than we would expect? Expected amount should be the product of the percentage of exchanged regions times the size of the trusted ancstral genome
+
+```{r}
+prod(HE_summary$HE_percent/100) * sum(width(Anc_trusted_gr))
+```
+
+So yes, we expect nothing in common.
+
+## Common genes
+
+get gffs
+```{r}
+Brgff <- rtracklayer::readGFF("../gffs/BrapaZ1_v2_annotation.gff") %>%
+  as.data.frame() %>%
+  filter(str_detect(seqid, "A[0-9]{2}"), type=="mRNA") %>%
+  mutate(seqid = str_c("Anc-", seqid)) %>%
+  makeGRangesFromDataFrame(start.field = "start", end.field = "end", keep.extra.columns = TRUE)
+
+Brgff
+```
+
+
+```{r}
+Bogff <- rtracklayer::readGFF("../gffs/BoleraceaHDEM_annotation.gff") %>%
+  as.data.frame() %>%
+  filter(str_detect(seqid, "^C"), type=="mRNA") %>%
+  mutate(seqid = str_c("Anc-", seqid)) %>%
+  makeGRangesFromDataFrame(start.field = "start", end.field = "end", keep.extra.columns = TRUE)
+  
+Bogff
+```
+
+```{r}
+Combinedgff <- suppressWarnings(c(Brgff, Bogff))
+```
+
+```{r}
+GenomicRanges::intersect(Combinedgff, HEcommon.gr, ignore.strand=TRUE)
+GenomicRanges::intersect(Combinedgff, HEcommon.gr, ignore.strand=TRUE) %>% width
+```
+
+
+```{r}
+HEgenes.gr <- subsetByOverlaps(Combinedgff, HEcommon.gr, ignore.strand=TRUE) 
+HEgenes.gr$ID
+```
+
+```{r}
+Br.aa <- readAAStringSet("../Assemblies/BrapaZ1_v2_proteins.fasta")
+names(Br.aa) <- names(Br.aa) %>% str_remove_all(c("Parent=| assembled CDS"))
+
+Bo.aa <- readAAStringSet("../Assemblies/BoleraceaHDEM_proteins.fasta")
+
+HEgenes.seq <- c(Br.aa, Bo.aa)[HEgenes.gr$ID]
+HEgenes.seq
+
+writeXStringSet(HEgenes.seq, "HEgenes_aa.fasta")
+```
+
+## BLAST
+
+use Phytozome web interface for BLASTP against Araport11
+
+```{r}
+blast.results <- read_tsv("HE_Genes_BLAST.tsv") %>%
+  select(-`...1`, -Views) %>%
+  group_by(`Query ID`) %>%
+  slice_max(Bitscore, n=1) %>%
+  ungroup() %>%
+  mutate(Protein = str_remove(Protein, "\\..")) %>%
+  magrittr::extract(!duplicated(.$`Query ID`),)
+
+blast.annotations <- read_csv("HE_Genes_BLAST_Annotations.csv") %>%
+  select(`Gene Name`, Description) %>%
+  unique()
+
+blast.results.annotated <- blast.results %>% left_join(blast.annotations, by=c("Protein"="Gene Name")) %>%
+  select(`Query ID`, Protein, `E-value`, Description )
+
+blast.results.annotated
+```
+
+## Pairwise comparisions
+
+```{r}
+get_min_HE <- function(assembly1, assembly2) {
+  min(c(HE_summary$HEsequence_total[HE_summary$assembly==assembly1],
+         HE_summary$HEsequence_total[HE_summary$assembly==assembly2]))
+}
+
+get_HE <- function(assembly1) HE_summary$HEsequence_total[HE_summary$assembly==assembly1]
+
+get_common <- function(assembly1, assembly2) {
+  GenomicRanges::intersect(comparisons$linksgr[[which(comparisons$assembly==assembly1)]],
+                           comparisons$linksgr[[which(comparisons$assembly==assembly2)]])
+}
+
+pairwise_comparisons <- expand_grid(assembly1=comparisons$assembly, assembly2=comparisons$assembly)
+
+pairwise_comparisons <- pairwise_comparisons %>%
+  mutate(assembly1_HE_bp=map_dbl(assembly1, get_HE),
+         min_HE_bp=map2_dbl(assembly1, assembly2, get_min_HE),
+         common_gr=map2(assembly1, assembly2, get_common),
+         common_bp=map_int(common_gr, ~ sum(width(.))),
+         common_proportion_min=common_bp / min_HE_bp,
+         common_proportion_assembly1 = common_bp / assembly1_HE_bp
+  )
+
+pairwise_comparisons
+
+```
+
+
+```{r}
+pairwise_comparisons %>%
+  mutate(common_proportion=ifelse(assembly1==assembly2, NA, common_proportion_min)) %>%
+  ggplot(aes(x=assembly2, y=assembly1, fill=common_proportion)) +
+  geom_raster() +
+  theme(axis.text.x = element_text(angle=90, hjust=1,vjust=0.5)) + 
+  ggtitle("Normalized by pairwise minimum HE size")
+```
+
+```{r}
+pairwise_comparisons %>%
+  mutate(common_proportion=ifelse(assembly1==assembly2, NA, common_proportion_assembly1)) %>%
+  ggplot(aes(x=assembly2, y=assembly1, fill=common_proportion)) +
+  geom_raster() +
+  theme(axis.text.x = element_text(angle=90, hjust=1,vjust=0.5)) + 
+  ggtitle("Normalized by assembly 1 HE size")
 ```
 
