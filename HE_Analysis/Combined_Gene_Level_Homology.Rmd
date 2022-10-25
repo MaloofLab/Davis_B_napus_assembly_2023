@@ -86,20 +86,20 @@ Double_A <- list(
   Darmor_Bzh_V10= DA_Darmor_Bzh_V10_Progenitors
 )
 windowsFonts("Arial" = windowsFont("Arial"))
-Plot3VennDiagram(title = "C to A Conversion",
-                 setlist = Double_A,
-                 setnames = setnames,
-                 filename = "C_to_A_Venndiagram.png")
+# Plot3VennDiagram(title = "C to A Conversion",
+#                  setlist = Double_A,
+#                  setnames = setnames,
+#                  filename = "C_to_A_Venndiagram.png")
 
 Double_C <- list(
   DaAe = DC_DaAe_Progenitors,
   ZS11 = DC_ZS11_Progenitors,
   Darmor_Bzh_V10= DC_Darmor_Bzh_V10_Progenitors
 )
-Plot3VennDiagram(title = "A to C Conversion",
-                 setlist = Double_C,
-                 setnames = setnames,
-                 filename = "A_to_C_Venndiagram.png")
+# Plot3VennDiagram(title = "A to C Conversion",
+#                  setlist = Double_C,
+#                  setnames = setnames,
+#                  filename = "A_to_C_Venndiagram.png")
 
 # Reverse ratios
 sum(DA_DaAe_Progenitors %in% DC_ZS11_Progenitors)
@@ -109,4 +109,43 @@ sum(DC_DaAe_Progenitors %in% DA_Darmor_Bzh_V10_Progenitors)
 sum(DA_ZS11_Progenitors %in% DC_Darmor_Bzh_V10_Progenitors)
 sum(DC_ZS11_Progenitors %in% DA_Darmor_Bzh_V10_Progenitors)
 ```
+
+### Julin gene update
+
+```{r}
+j_genes <- read_csv("HEGenes_Common.csv") %>%
+  select("GeneID" = x) %>%
+  pull(GeneID)
+
+j_genes
+
+# union of Double A
+intersect(DA_DaAe_Progenitors, DA_ZS11_Progenitors) %>%
+  intersect(., DA_Darmor_Bzh_V10_Progenitors) %>%
+  str_split(., "_Bol",) %>%
+  unlist() %>%
+  str_replace(., "^C", "BolC") %>%
+  intersect(j_genes)
+
+# union of Double C
+intersect(DC_DaAe_Progenitors, DC_ZS11_Progenitors) %>%
+  intersect(., DC_Darmor_Bzh_V10_Progenitors) %>%
+  str_split(., "_Bol",) %>%
+  unlist() %>%
+  str_replace(., "^C", "BolC") %>%
+  intersect(j_genes)
+
+### Just DaAe
+# A
+str_split(DA_DaAe_Progenitors, "_Bol",) %>%
+  unlist() %>%
+  str_replace(., "^C", "BolC") %>%
+  intersect(j_genes)
+# C
+str_split(DC_DaAe_Progenitors, "_Bol",) %>%
+  unlist() %>%
+  str_replace(., "^C", "BolC") %>%
+  intersect(j_genes)
+```
+
 
