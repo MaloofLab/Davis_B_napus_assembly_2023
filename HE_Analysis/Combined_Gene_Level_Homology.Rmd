@@ -147,5 +147,3 @@ str_split(DC_DaAe_Progenitors, "_Bol",) %>%
   str_replace(., "^C", "BolC") %>%
   intersect(j_genes)
 ```
-
-
