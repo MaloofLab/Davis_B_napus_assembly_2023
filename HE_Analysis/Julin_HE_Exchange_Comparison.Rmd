@@ -335,7 +335,7 @@ Bogff <- rtracklayer::readGFF("../gffs/BoleraceaHDEM_annotation.gff") %>%
   filter(str_detect(seqid, "^C"), type=="mRNA") %>%
   mutate(seqid = str_c("Anc-", seqid)) %>%
   makeGRangesFromDataFrame(start.field = "start", end.field = "end", keep.extra.columns = TRUE)
-  
+
 Bogff
 ```
 
@@ -352,6 +352,8 @@ GenomicRanges::intersect(Combinedgff, HEcommon.gr, ignore.strand=TRUE) %>% width
 ```{r}
 HEgenes.gr <- subsetByOverlaps(Combinedgff, HEcommon.gr, ignore.strand=TRUE) 
 HEgenes.gr$ID
+
+HEgenes.gr$ID %>%  unique() %>% write.csv("HEGenes_Common.csv")
 ```
 
 ```{r}
@@ -394,7 +396,7 @@ blast.results.annotated
 ```{r}
 get_min_HE <- function(assembly1, assembly2) {
   min(c(HE_summary$HEsequence_total[HE_summary$assembly==assembly1],
-         HE_summary$HEsequence_total[HE_summary$assembly==assembly2]))
+        HE_summary$HEsequence_total[HE_summary$assembly==assembly2]))
 }
 
 get_HE <- function(assembly1) HE_summary$HEsequence_total[HE_summary$assembly==assembly1]
@@ -436,5 +438,23 @@ pairwise_comparisons %>%
   geom_raster() +
   theme(axis.text.x = element_text(angle=90, hjust=1,vjust=0.5)) + 
   ggtitle("Normalized by assembly 1 HE size")
+```
+
+## Genes in each individual HE analysis
+
+```{r}
+get_HE_genes <- function(HE.gr, gff.gr=Combinedgff) {
+  subsetByOverlaps(gff.gr, HE.gr, ignore.strand=TRUE)$ID
+}
+
+comparisons <- comparisons %>%
+  mutate(HEgenes = map(linksgr, get_HE_genes))
+
+HEgenes <- plyr::ldply(comparisons$HEgenes, rbind) %>%
+  magrittr::set_colnames(comparisons$directory)
+
+HEgenes
+
+write_csv(HEgenes, "HEgenes_all.csv")
 ```
 
