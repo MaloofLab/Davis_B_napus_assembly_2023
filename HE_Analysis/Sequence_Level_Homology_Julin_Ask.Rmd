@@ -33,6 +33,12 @@ Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_nap
 DaAe_Coverage <- Coverage_Readin("Combined_Coverages/Combined_DaAe_Coverage.tsv.gz")
 ```
 
+```{r}
+## read in info on homoeoloous exchanges based on nucmer (Julin analysis)
+load("Julin_HE_Comparisons.Rdata")
+```
+
+
 # Format the data a bit
 
 ```{r}
@@ -103,7 +109,7 @@ for (i in chroms) {
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
                  })
-  ggsave(paste0("Coverage_Plots_20220929/",i,".png"))
+  #ggsave(paste0("Coverage_Plots_20221030/",i,".png"))
 }
 ```
 
@@ -191,6 +197,36 @@ Clustered_All <- rbind(Clustered_Pseudo_napus_Coverage, Clustered_DaAe_Coverage,
 Clustered_All$Assembly <- factor(Clustered_All$Assembly, levels = c("Pseudo_napus", "DaAe", "ZS11", "Darmor-Bzh_V10"))
 ```
 
+# organize HE positions
+
+Trying to compare John and Julin Lengths
+```{r}
+Clustered_All %>% group_by(Assembly, Chromosome) %>%
+  filter(Assembly != "Psuedo_napus") %>%
+  summarise(max(Position))
+```
+
+
+```{r}
+levels(Clustered_All$Assembly)
+unique(comparisons$assembly)
+```
+
+
+```{r}
+HEpos <- comparisons %>% 
+  filter(assembly %in% levels(Clustered_All$Assembly)) %>%
+  select(Assembly=assembly, links) %>% 
+  unnest(links) %>%
+  mutate(Start=ref.start, 
+         End=ref.end,
+         Chromosome=str_replace(ref.name, "^.*([AC][0-9]{1,2})", "chr\\1"))
+
+HEpos
+
+HEpos %>% group_by(Assembly, Chromosome) %>%
+  summarize(max(End))
+```
 # Load Position data
 ```{r}
 load("DaAe_Gene_Positions.RData")
@@ -223,6 +259,7 @@ All_Positions <- rbind(DA_DaAe_Positions, DA_ZS11_Positions, DA_Darmor_Bzh_V10_P
                        DC_DaAe_Positions, DC_ZS11_Positions, DC_Darmor_Bzh_V10_Positions)
 ```
 
+
 # Plot
 
 ```{r}
@@ -230,6 +267,7 @@ chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
 for (i in chroms) {
   Clustered_All %>% filter(Chromosome == i) %>%
     mutate(Consensus = ifelse(Consensus >= 4.5, 4.5, Consensus)) %>%
+    mutate(Assembly = as.character(Assembly)) %>%
     ggplot(aes(x = Position, y = Consensus)) +
     geom_point(aes(colour = cut(Consensus, c(-Inf, 0.6, 1.4, Inf)))) +
     scale_color_manual(name = "Consensus",
@@ -237,6 +275,9 @@ for (i in chroms) {
                                   "(0.6,1.4]" = "black",
                                   "(1.4, Inf]" = "blue"),
                      labels = c("<= 0.6", "0.6 < Consensus <= 1.4", "> 1.4")) +
+    geom_rect(data = {HEpos %>% filter(Chromosome == i)}, 
+              aes(xmin=Start, xmax=End), 
+              ymax=0, ymin=-1, fill="black", inherit.aes = FALSE) + 
     ggtitle(i) +
     geom_hline(yintercept = 1.5, color="black") +
     geom_hline(yintercept = 1, color="black") +
@@ -251,7 +292,7 @@ for (i in chroms) {
                  }) +
     geom_text(data = All_Positions %>% filter(Chromosome == i),
                aes(x = Position, y = Y, label = Shaped))
-  ggsave(paste0("Coverage_Plots_20220929/",i,".png"), width = 10, height = 10)
+  ggsave(paste0("Coverage_Plots_20221030/",i,".png"), width = 10, height = 10)
 }
 
 save(Clustered_All, All_Positions, file = "Julin_Coverages_and_Positions_median.RData")

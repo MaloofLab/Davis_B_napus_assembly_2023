@@ -458,3 +458,18 @@ HEgenes
 write_csv(HEgenes, "HEgenes_all.csv")
 ```
 
+```{r}
+comparisons
+```
+```{r}
+comparisons$linksgr[[1]]
+```
+
+```{r}
+comparisons$links[[1]]
+```
+
+```{r}
+save(comparisons, file="Julin_HE_Comparisons.Rdata")
+```
+
