@@ -69,7 +69,7 @@ p
 
 ```{r}
 colnames <- unlist(strsplit("ref.start ref.end q.start q.end ref.len q.len pct.id ref.name q.name", split=" "))
-links <- read_lines("../HE_Analysis/DaAe_vs_Ancestral/DaAe_vs_Ancestral.filter-1.show-coords.gz", skip = 5)
+links <- read_lines("../HE_Analysis/DaAe_vs_Ancestral/DaAe_vs_Ancestral-1.show-coords.gz", skip = 5)
 system.time(links <- links %>% str_replace_all("\\||\\t", " ") %>%
               str_trim() %>%
               tibble(data=.) %>% 
