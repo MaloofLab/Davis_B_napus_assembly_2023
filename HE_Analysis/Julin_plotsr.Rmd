@@ -1,0 +1,49 @@
+---
+title: "Julin_plotsr_plots"
+author: "Julin Maloof"
+date: "2022-11-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Plotting HE exchange (and coverage?) with [plotsr](https://github.com/schneebergerlab/plotsr)
+
+```{r}
+library(tidyverse)
+```
+
+
+# generate files
+
+```{r}
+if(!dir.exists("plotsr")) dir.create("plotsr")
+```
+
+
+## chr lengths
+
+```{r}
+# get the files and data
+chrom.lengths <- tibble(file=dir("../Assemblies", pattern = "lengths", full.names = TRUE)) %>%
+  mutate(lengths=map(file, read_tsv, show_col_types=FALSE, col_names=c("chrom", "length")),
+         file=basename(file))
+
+# make consistent names
+chrom.lengths <- chrom.lengths %>%
+  mutate(lengths = map(lengths, function(x) {
+    x %>% 
+      mutate(chrom=str_replace(chrom, "^.*([AC][0-9]{1,2})$", "\\1"), #remove prefix
+             chrom=str_replace(chrom, "C([1-9])", "C0\\1")) # pad C numbers if needed
+  }))
+
+chrom.lengths %>% unnest(lengths) %>%  pull(chrom) %>% unique()
+```
+
+write the files
+```{r}
+chrom.lengths %>% pwalk( ~ write_tsv(.y, file.path("plotsr", .x), col_names = FALSE))
+```
+
