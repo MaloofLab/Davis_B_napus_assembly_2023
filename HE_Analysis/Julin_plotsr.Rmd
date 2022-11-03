@@ -67,6 +67,17 @@ genome.info <- genome.info[positions,]
 genome.info
 
 write_tsv(genome.info, "plotsr/genomes.txt")
+
+# get order right (flipped)
+positions <- match(c("ZS11", "Ancestral", "DaAe"), genome.info$name)
+
+genome.info <- genome.info[positions,]
+
+genome.info
+
+write_tsv(genome.info, "plotsr/genomes_rev.txt")
+
+
 ```
 
 # synteny and rearrangement files:
@@ -222,14 +233,14 @@ These columns are needed:
 * Query end position
 * Annotation type
 
-for each pairwise comparison need to create a BEDPE comparison file.  In these files, "reference" would be the upper genome in the plot and "query" will be the lower.  So DaAe will be handled separately from the rest.  For DaAe, DaAe is the reference, and Ancestral is the query.  For all others, Ancestral is the reference and the B. napus is the query.
+for each pairwise comparison need to create a BEDPE comparison file.  In these files, "reference" would be the upper genome in the plot and "query" will be the lower.  So DaAe will be handled separately from the rest.  For DaAe, DaAe is the query, and Ancestral is the reference  For all others, Ancestral is the query and the B. napus is the reference.
 
 ```{r}
 plotsr <- comparisons %>%
   mutate(plotsr.out = map(linksgr, as.data.frame))%>%
   select(-links, -linksgr)
 
-head(plotsr$plotsr.out[[1]])
+head(plotsr$plotsr.out[[2]])
 ```
 ### DaAe:
 
@@ -240,27 +251,28 @@ DaAe.plotsr <- plotsr %>%
   magrittr::extract2(1)
 
 DaAe.plotsr <- DaAe.plotsr %>%
-  select(r.chrom=to.GR.seqnames,
-         r.start=to.GR.start,
-         r.end=to.GR.end,
+  select(r.chrom=seqnames,
+         r.start=start,
+         r.end=end,
          strand,
-         q.chrom=seqnames,
-         q.start=start,
-         q.end=end,
+         q.chrom=to.GR.seqnames,
+         q.start=to.GR.start,
+         q.end=to.GR.end,
          pct.id,
          ref.len)
 
 DaAe.plotsr <- DaAe.plotsr %>%
   filter(pct.id > 90, ref.len > 100) %>%
-  mutate(r.chrom=str_remove(r.chrom, "DaAe-"),
-         q.chrom=str_remove(q.chrom, "Anc-"),
-         q.chrom=str_replace(q.chrom, "C([1-9])", "C0\\1"),
+  mutate(q.chrom=str_remove(q.chrom, "DaAe-"),
+         r.chrom=str_remove(r.chrom, "Anc-"),
+         r.chrom=str_replace(r.chrom, "C([1-9])", "C0\\1"),
          q.start.new=ifelse(strand=="-", q.end, q.start),
          q.end=ifelse(strand=="-", q.start, q.end),
          q.start=q.start.new,
-         ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3), "TRANS", "SYN"),
-         ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
-         ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann )) %>%
+         ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3), "TRANS", "SYN")#,
+   #      ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
+  #       ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann )
+  ) %>%
   select(-pct.id, -ref.len, -strand, -q.start.new) %>%
   arrange(r.chrom, r.start)
 
@@ -268,7 +280,7 @@ DaAe.plotsr <- DaAe.plotsr %>%
 head(DaAe.plotsr)
 
 # write it
-write_tsv(DaAe.plotsr, "plotsr/DaAe_Ancestral.bedpe", col_names = FALSE)
+write_tsv(DaAe.plotsr, "plotsr/Ancestral_DaAe.bedpe", col_names = FALSE)
 ```
 ```{r}
 any(DaAe.plotsr$q.start > DaAe.plotsr$q.end)
@@ -283,29 +295,28 @@ others.plotsr <- plotsr %>%
 others.plotsr <- others.plotsr %>%
   mutate(plotsr.out = map(plotsr.out, function(x) {
     x %>% 
-      select(
-        r.chrom=seqnames,
-        r.start=start,
-        r.end=end,
-        strand,
-        q.chrom=to.GR.seqnames,
-        q.start=to.GR.start,
-        q.end=to.GR.end,
-        pct.id,
-        ref.len) %>%
+  select(r.chrom=to.GR.seqnames,
+         r.start=to.GR.start,
+         r.end=to.GR.end,
+         strand,
+         q.chrom=seqnames,
+         q.start=start,
+         q.end=end,
+         pct.id,
+         ref.len) %>%
       
       filter(pct.id > 90, ref.len > 100) %>%
       
-      mutate(r.chrom=str_remove(r.chrom, "Anc-"),
+      mutate(q.chrom=str_remove(q.chrom, "Anc-"),
              r.chrom=str_replace(r.chrom, "C([1-9])", "C0\\1"),
-             q.chrom=str_replace(q.chrom, "^.*([AC][0-9]{1,2})$", "\\1"),
+             r.chrom=str_replace(r.chrom, "^.*([AC][0-9]{1,2})$", "\\1"),
              q.chrom=str_replace(q.chrom, "C([1-9])", "C0\\1"),
              q.start.new=ifelse(strand=="-", q.end, q.start),
              q.end=ifelse(strand=="-", q.start, q.end),
              q.start=q.start.new,
-             ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3), "TRANS", "SYN"),
-             ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
-             ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann ),
+             ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3), "TRANS", "SYN")#,
+           #  ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
+            # ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann ),
              ) %>%
       select(-pct.id, -ref.len, -q.start.new, -strand) %>%
       arrange(r.chrom, r.start)
@@ -315,14 +326,64 @@ others.plotsr <- others.plotsr %>%
   )
 
 others.plotsr
+others.plotsr$plotsr.out[[9]]
 ```
 
 ```{r}
 others.plotsr %>%
   select(-directory) %>%
-  pwalk(~ write_tsv(.y, file.path("plotsr", str_c("Ancestral_", .x, ".bedpe")), col_names = FALSE))
+  pwalk(~ write_tsv(.y, file.path("plotsr", str_c(.x, "_Ancestral.bedpe")), col_names = FALSE))
 ```
 
+```{r}
+any(others.plotsr$plotsr.out[[9]]$r.start > others.plotsr$plotsr.out[[9]]$r.end)
+any(others.plotsr$plotsr.out[[9]]$q.start > others.plotsr$plotsr.out[[9]]$q.end)
+
+
+```
+
+```{r}
+others.plotsr$plotsr.out[[9]] %>%
+  group_by(r.chrom) %>%
+  summarize(maxrstart=max(r.start), maxrend=max(r.end))
+
+others.plotsr$plotsr.out[[9]] %>%
+  group_by(q.chrom) %>%
+  summarize(maxqstart=max(q.start), maxqend=max(q.end))
+```
+
+
+# Add coverages
+
+```{r}
+load("Julin_Coverages_and_Positions_median.RData")
+str(Clustered_All)
+Clustered_All <- Clustered_All %>%   mutate(Chromosome=str_remove(Chromosome, "chr"))
+levels(Clustered_All$Assembly)
+unique(Clustered_All$Chromosome)
+```
+
+```{r}
+Clustered_All %>% filter(Assembly=="DaAe", !is.na(Consensus)) %>%
+  select(Chromosome, Start, End, Consensus) %>%
+  write_tsv("plotsr/DaAeCov.bedgraph", col_names = FALSE)
+
+Clustered_All %>% filter(Assembly=="ZS11", !is.na(Consensus)) %>%
+  select(Chromosome, Start, End, Consensus) %>%
+  write_tsv("plotsr/ZS11Cov.bedgraph", col_names = FALSE)
+```
+
+## create tracksinfo gile
+
+```{r}
+tibble(`#file`="DaAeCov.bedgraph", name="DaAE_Coverage", tags="ft:bedgraph;bw:10000") %>%
+  write_tsv("plotsr/DaAeTracks.txt")
+
+tibble(`#file`="ZS11Cov.bedgraph", name="ZS11_Coverage", tags="ft:bedgraph;bw:10000") %>%
+  write_tsv("plotsr/ZS11Tracks.txt")
+```
+
+# plot it
 
 ```{bash}
 cd plotsr
@@ -332,9 +393,24 @@ source ~/.zshrc
 conda activate plotsr
 
 plotsr --itx \
---bp DaAe_Ancestral.bedpe \
---bp Ancestral_ZS11.bedpe \
---genomes genomes.txt \
+--bp ZS11_Ancestral.bedpe \
+--bp Ancestral_DaAe.bedpe \
+--genomes genomes_rev.txt \
 -R -W 12 -H 4 
 ```
 
+plot with tracks
+```{bash}
+cd plotsr
+
+source ~/.zshrc
+
+conda activate plotsr
+
+plotsr --itx \
+--bp ZS11_Ancestral.bedpe \
+--bp Ancestral_DaAe.bedpe \
+--genomes genomes_rev.txt \
+--tracks ZS11Tracks.txt \
+-R -W 12 -H 4 
+```
