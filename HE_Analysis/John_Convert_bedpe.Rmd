@@ -44,5 +44,9 @@ Ancestral.convert.bedpe <- function(file){
 }
 
 Ancestral.convert.bedpe("plotsr/Ancestral_ZS11.bedpe")
+
+Ancestral.convert.bedpe("plotsr/Ancestral_DaAe.bedpe")
+
+B.napus.convert.bedpe("plotsr/ZS11_Ancestral.bedpe")
 ```
 
