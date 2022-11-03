@@ -13,6 +13,8 @@ Plotting HE exchange (and coverage?) with [plotsr](https://github.com/schneeberg
 
 ```{r}
 library(tidyverse)
+library(GenomicRanges)
+library(Biostrings)
 ```
 
 
@@ -31,7 +33,7 @@ chrom.lengths <- tibble(file=dir("../Assemblies", pattern = "lengths", full.name
   mutate(lengths=map(file, read_tsv, show_col_types=FALSE, col_names=c("chrom", "length")),
          file=basename(file))
 
-# make consistent names
+# make consistent chrom names
 chrom.lengths <- chrom.lengths %>%
   mutate(lengths = map(lengths, function(x) {
     x %>% 
@@ -39,11 +41,300 @@ chrom.lengths <- chrom.lengths %>%
              chrom=str_replace(chrom, "C([1-9])", "C0\\1")) # pad C numbers if needed
   }))
 
+#update file names to mactch plots requirement
+chrom.lengths <- chrom.lengths %>%
+  mutate(file=str_replace(file, "_chrom_lengths.txt", ".chrlen"))
+
+# write the files
+chrom.lengths %>% pwalk( ~ write_tsv(.y, file.path("plotsr", .x), col_names = FALSE))
+
+#verify chrom names
 chrom.lengths %>% unnest(lengths) %>%  pull(chrom) %>% unique()
 ```
 
-write the files
+## genome info
+
 ```{r}
-chrom.lengths %>% pwalk( ~ write_tsv(.y, file.path("plotsr", .x), col_names = FALSE))
+genome.info <- tibble(`#file` = dir("plotsr", pattern="chrlen"),
+                      name = str_remove(`#file`, "\\.chrlen"),
+                      tag = "ft:cl") 
+
+# get order right
+positions <- match(c("DaAe", "Ancestral", "ZS11"), genome.info$name)
+
+genome.info <- genome.info[positions,]
+
+genome.info
+
+write_tsv(genome.info, "plotsr/genomes.txt")
+```
+
+# synteny and rearrangement files:
+
+This is almost the same code as from the HE_Comparison, but I need to not filter by HE.  (although note there is an option to only have HE if desired)
+
+## Set up Ancestral chromosomes
+
+```{r}
+Anc_lengths <- read_tsv("../Assemblies/pseudo_napus_chrom_lengths.txt", col_names = c("chrom", "length")) %>%
+  mutate(chrom=str_c("Anc-", chrom)) %>%
+  mutate(grangeinput =str_c(chrom,":1-",length))
+
+Anc_chroms <- GRanges(Anc_lengths$grangeinput)
+seqlengths(Anc_chroms) <- Anc_lengths %>% pull(length) 
+
+
+Br_chroms <- Anc_chroms[str_detect(seqnames(seqinfo(Anc_chroms)), "Anc-A")]
+seqlevels(Br_chroms) <- str_subset(seqlevels(Br_chroms), "Anc-A") #drop unused levels
+
+Bo_chroms <- Anc_chroms[str_detect(seqnames(seqinfo(Anc_chroms)), "Anc-C")]
+seqlevels(Bo_chroms) <- str_subset(seqlevels(Bo_chroms), "Anc-C")
+```
+
+### Get the Br vs Bo Comparison
+
+```{r}
+colnames <- unlist(strsplit("ref.start ref.end q.start q.end ref.len q.len pct.id ref.name q.name", split=" "))
+
+Br_vs_Bo <- read_lines("../HE_Analysis/Brapa_vs_Boleracea/Brapa_vs_Boleracea-1.show-coords.gz", skip=5)
+system.time(Br_vs_Bo <- Br_vs_Bo %>% str_replace_all("\\||\\t", " ") %>%
+              str_trim() %>%
+              tibble(data=.) %>% 
+              separate(data, into=colnames, sep=" +", convert=TRUE) 
+) #system.time
+```
+
+Reformat chromosome names
+```{r}
+Br_vs_Bo <- Br_vs_Bo %>%
+  mutate(ref.name=str_c("Anc-", ref.name),
+         q.name=str_c("Anc-",q.name)) %>%
+  rowwise() %>%
+  mutate(q.start.new=min(q.start, q.end),
+         q.end=max(q.start, q.end),
+         q.start=q.start.new) %>%
+  select(-q.start.new)
+
+head(Br_vs_Bo)
+```
+Take a look:
+```{r}
+Br_vs_Bo %>% ggplot(aes(x=ref.len)) +
+  geom_histogram() +
+  scale_x_log10()
+
+Br_vs_Bo %>% ggplot(aes(x=pct.id)) +
+  geom_histogram()
+```
+Filter it
+
+```{r}
+Br_vs_Bo.filter <- Br_vs_Bo %>% filter(pct.id >= 85, ref.len>=500)
+```
+
+Make a Br_vs_Bo Granges that has both genomes on the left hand side.  These are "Trusted" regions where we "know" that there is a 1:1 correspondence between the two assemblies.
+```{r}
+Anc_trusted_gr <- c(with(Br_vs_Bo.filter,
+                         GRanges(seqinfo=seqinfo(Anc_chroms),
+                                 seqnames = ref.name,
+                                 ranges = IRanges(start=ref.start, end=ref.end))),
+                    with(Br_vs_Bo.filter,
+                         GRanges(seqinfo=seqinfo(Anc_chroms),
+                                 seqnames = q.name,
+                                 ranges = IRanges(start=q.start, end=q.end))))
+
+```
+
+## Loop through assemblies
+
+For each assembly we want to load the Nucmer file, filter based on HE, %ID, length, and whether it overlaps with a trusted ancestral region.
+
+```{r}
+comparisons <- tibble(directory=dir(pattern="_vs_Ancestral", include.dirs = TRUE),
+                      assembly=str_remove(directory, "_vs_Ancestral"))
+comparisons
+```
+
+```{r}
+colnames <- unlist(strsplit("ref.start ref.end q.start q.end ref.len q.len pct.id ref.name q.name", split=" "))
+
+get_links <- function(directory) { # function to read in and format nucmer comparison info
+  links <- read_lines(file.path(directory,str_c(directory,"-1.show-coords.gz")), skip = 5)
+  links <- links %>% str_replace_all("\\||\\t", " ") %>%
+    str_trim() %>%
+    tibble(data=.) %>% 
+    separate(data, into=colnames, sep=" +", convert=TRUE) 
+  
+  #extract subgenome info and reformat chromosome names
+  links <- links %>%
+    mutate(
+      ref.subg = str_replace(ref.name, ".*(A|C)[0-9]{1,2}$", "\\1"),
+      q.subg =  str_replace(q.name, ".*(A|C)[0-9]{1,2}$", "\\1"),
+      ref.name=str_replace(ref.name, "chr", "DaAe-"),
+      q.name=str_c("Anc-",q.name)) %>%
+    rowwise() %>%
+    mutate(q.dir=ifelse(q.start > q.end, "-", "+"),
+           q.start.new=min(q.start, q.end),
+           q.end=max(q.start, q.end),
+           q.start=q.start.new) %>%
+    select(-q.start.new)
+  
+  return(links)
+}
+
+#Function to convert links to Genomics Ranges
+links_to_gr <- function(links) { 
+  linksgr <- with(links, GRanges(seqinfo=seqinfo(Anc_chroms),
+                                 seqnames = q.name, #query is ancestral, 
+                                 ranges = IRanges(start=q.start, end=q.end),
+                                 strand=q.dir,
+                                 to.GR = GRanges(seqnames = ref.name,
+                                                 ranges = IRanges(start=ref.start,
+                                                                  end=ref.end)),
+                                 pct.id = pct.id,
+                                 ref.len = ref.len
+  ))
+  linksgr <- subsetByOverlaps(linksgr, Anc_trusted_gr, ignore.strand=TRUE)
+  linksgr
+}
+```
+
+```{r}
+system.time(
+  comparisons <- comparisons %>% 
+    mutate(links=map(directory, get_links))
+)
+```
+
+```{r}
+comparisons <- comparisons %>%
+  mutate(linksgr = map(links, links_to_gr))
+```
+
+## Format for plotsr
+
+These columns are needed:
+* Reference chromosome name
+* Reference start position
+* Reference end position
+* Query chromosome name
+* Query start position
+* Query end position
+* Annotation type
+
+for each pairwise comparison need to create a BEDPE comparison file.  In these files, "reference" would be the upper genome in the plot and "query" will be the lower.  So DaAe will be handled separately from the rest.  For DaAe, DaAe is the reference, and Ancestral is the query.  For all others, Ancestral is the reference and the B. napus is the query.
+
+```{r}
+plotsr <- comparisons %>%
+  mutate(plotsr.out = map(linksgr, as.data.frame))%>%
+  select(-links, -linksgr)
+
+head(plotsr$plotsr.out[[1]])
+```
+### DaAe:
+
+```{r}
+DaAe.plotsr <- plotsr %>%
+  filter(assembly=="DaAe") %>%
+  pull(plotsr.out) %>%
+  magrittr::extract2(1)
+
+DaAe.plotsr <- DaAe.plotsr %>%
+  select(r.chrom=to.GR.seqnames,
+         r.start=to.GR.start,
+         r.end=to.GR.end,
+         strand,
+         q.chrom=seqnames,
+         q.start=start,
+         q.end=end,
+         pct.id,
+         ref.len)
+
+DaAe.plotsr <- DaAe.plotsr %>%
+  filter(pct.id > 90, ref.len > 100) %>%
+  mutate(r.chrom=str_remove(r.chrom, "DaAe-"),
+         q.chrom=str_remove(q.chrom, "Anc-"),
+         q.chrom=str_replace(q.chrom, "C([1-9])", "C0\\1"),
+         q.start.new=ifelse(strand=="-", q.end, q.start),
+         q.end=ifelse(strand=="-", q.start, q.end),
+         q.start=q.start.new,
+         ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3), "TRANS", "SYN"),
+         ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
+         ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann )) %>%
+  select(-pct.id, -ref.len, -strand, -q.start.new) %>%
+  arrange(r.chrom, r.start)
+
+
+head(DaAe.plotsr)
+
+# write it
+write_tsv(DaAe.plotsr, "plotsr/DaAe_Ancestral.bedpe", col_names = FALSE)
+```
+```{r}
+any(DaAe.plotsr$q.start > DaAe.plotsr$q.end)
+```
+
+### everybody else
+
+```{r}
+others.plotsr <- plotsr %>%
+  filter(assembly!="DaAe")
+
+others.plotsr <- others.plotsr %>%
+  mutate(plotsr.out = map(plotsr.out, function(x) {
+    x %>% 
+      select(
+        r.chrom=seqnames,
+        r.start=start,
+        r.end=end,
+        strand,
+        q.chrom=to.GR.seqnames,
+        q.start=to.GR.start,
+        q.end=to.GR.end,
+        pct.id,
+        ref.len) %>%
+      
+      filter(pct.id > 90, ref.len > 100) %>%
+      
+      mutate(r.chrom=str_remove(r.chrom, "Anc-"),
+             r.chrom=str_replace(r.chrom, "C([1-9])", "C0\\1"),
+             q.chrom=str_replace(q.chrom, "^.*([AC][0-9]{1,2})$", "\\1"),
+             q.chrom=str_replace(q.chrom, "C([1-9])", "C0\\1"),
+             q.start.new=ifelse(strand=="-", q.end, q.start),
+             q.end=ifelse(strand=="-", q.start, q.end),
+             q.start=q.start.new,
+             ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3), "TRANS", "SYN"),
+             ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
+             ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann ),
+             ) %>%
+      select(-pct.id, -ref.len, -q.start.new, -strand) %>%
+      arrange(r.chrom, r.start)
+    
+  }
+  )
+  )
+
+others.plotsr
+```
+
+```{r}
+others.plotsr %>%
+  select(-directory) %>%
+  pwalk(~ write_tsv(.y, file.path("plotsr", str_c("Ancestral_", .x, ".bedpe")), col_names = FALSE))
+```
+
+
+```{bash}
+cd plotsr
+
+source ~/.zshrc
+
+conda activate plotsr
+
+plotsr --itx \
+--bp DaAe_Ancestral.bedpe \
+--bp Ancestral_ZS11.bedpe \
+--genomes genomes.txt \
+-R -W 12 -H 4 
 ```
 
