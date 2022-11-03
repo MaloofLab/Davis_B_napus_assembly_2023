@@ -13,7 +13,7 @@ library(tidyverse)
 ```
 
 ```{r}
-convert.bedpe <- function(file){
+B.napus.convert.bedpe <- function(file){
   df <- read_tsv(file, col_names = F) %>% 
     mutate(X7 = ifelse(X7 == "TRANS",
                        paste(X7, X1, sep = "-"),
@@ -28,6 +28,25 @@ convert.bedpe <- function(file){
 }
 
 convert.bedpe("plotsr/DaAe_Ancestral.bedpe")
-convert.bedpe("plotsr/Ancestral_ZS11.bedpe")
+
+Ancestral.convert.bedpe <- function(file){
+  df <- read_tsv(file, col_names = F) %>% 
+    mutate(X7 = ifelse(X7 == "TRANS",
+                       paste(X7, X4, sep = "-"),
+                       X7)
+           )
+  rdir <- dirname(file)
+  rname <- paste("Modifed", basename(file), sep = "_")
+  write_tsv(df,
+            file.path(rdir,rname),
+            col_names = F
+            )
+}
+
+Ancestral.convert.bedpe("plotsr/Ancestral_ZS11.bedpe")
+
+Ancestral.convert.bedpe("plotsr/Ancestral_DaAe.bedpe")
+
+B.napus.convert.bedpe("plotsr/ZS11_Ancestral.bedpe")
 ```
 
