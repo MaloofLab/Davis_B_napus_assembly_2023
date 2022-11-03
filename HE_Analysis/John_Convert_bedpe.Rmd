@@ -1,0 +1,33 @@
+---
+title: "John_Convert_bedpe"
+output: html_document
+date: "2022-11-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+convert.bedpe <- function(file){
+  df <- read_tsv(file, col_names = F) %>% 
+    mutate(X7 = ifelse(X7 == "TRANS",
+                       paste(X7, X1, sep = "-"),
+                       X7)
+           )
+  rdir <- dirname(file)
+  rname <- paste("Modifed", basename(file), sep = "_")
+  write_tsv(df,
+            file.path(rdir,rname),
+            col_names = F
+            )
+}
+
+convert.bedpe("plotsr/DaAe_Ancestral.bedpe")
+convert.bedpe("plotsr/Ancestral_ZS11.bedpe")
+```
+
