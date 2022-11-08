@@ -599,7 +599,7 @@ class track():
             for line in fin:
                 line = line.strip().split()
                 try:
-                    v = int(line[3])
+                    v = float(line[3])
                 except ValueError:
                     if len(line) < 4:
                         self.logger.warning("Incomplete information in bedgraph file at line: {}. Skipping it.".format("\t".join(line)))
@@ -613,22 +613,22 @@ class track():
                     continue
                 if curchr == '':
                     curchr = line[0]
-                    binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=int)
+                    binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=float)
                     s = int(line[1])
                     e = int(line[2])
                     if s//bw == e//bw:
-                        binv[s//bw] += (e-s)*v
+                        binv[s//bw] = v #+= (e-s)*v
                     else:
-                        binv[s//bw] += (bw-(s%bw))*v
-                        binv[e//bw] += (e%bw)*v
+                        binv[s//bw] = v #+= (bw-(s%bw))*v
+                        binv[e//bw] = v #+= (e%bw)*v
                 elif curchr == line[0]:
                     s = int(line[1])
                     e = int(line[2])
                     if s//bw == e//bw:
-                        binv[s//bw] += (e-s)*v
+                        binv[s//bw] = v #+= (e-s)*v
                     else:
-                        binv[s//bw] += (bw-(s%bw))*v
-                        binv[e//bw] += (e%bw)*v
+                        binv[s//bw] = v #+= (bw-(s%bw))*v
+                        binv[e//bw] = v #+= (e%bw)*v
                 else:
                     if line[0] in added_chrs:
                         self.logger.error("BedGraph file: {} is not sorted. For plotting tracks, sorted BedGraph file is required. Exiting.".format(self.f))
@@ -639,25 +639,25 @@ class track():
                     added_chrs.append(curchr)
                     # Set the new chromosome
                     curchr = line[0]
-                    binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=int)
+                    binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=float)
                     s = int(line[1])
                     e = int(line[2])
                     if s//bw == e//bw:
-                        binv[s//bw] += (e-s)*v
+                        binv[s//bw] = v # += (e-s)*v
                     else:
-                        binv[s//bw] += (bw-(s%bw))*v
-                        binv[e//bw] += (e%bw)*v
+                        binv[s//bw] = v # += (bw-(s%bw))*v
+                        binv[e//bw] = v # += (e%bw)*v
         bins = np.concatenate((np.arange(0, chrlengths[0][1][curchr], bw), np.array([chrlengths[0][1][curchr]])), axis=0)
         bins = [(bins[i] + bins[i+1])/2 for i in range(len(bins) - 1)]
         bincnt[curchr] = deque([(bins[i], binv[i]) for i in range(len(bins))])
         ## Scale count values
-        maxv = 0
-        for k, v in bincnt.items():
-            for r in v:
-                if r[1] > maxv:
-                    maxv = r[1]
-        for k, v in bincnt.items():
-            bincnt[k] = deque([(r[0], r[1]/maxv) for r in v])
+        # maxv = 0
+        # for k, v in bincnt.items():
+        #     for r in v:
+        #         if r[1] > maxv:
+        #             maxv = r[1]
+        # for k, v in bincnt.items():
+        #     bincnt[k] = deque([(r[0], r[1]/maxv) for r in v])
         self.bincnt = bincnt
         return
     # END
@@ -1651,7 +1651,12 @@ def drawtracks(ax, tracks, s, chrgrps, chrlengths, v, itx, cfg, minl=0, maxl=-1)
                 if not v:
                     y0 = cl - j - th*(i+1) if not itx else 1 - th*(i+1)
                     ypos = [(t*diff/tposmax)+y0 for t in tpos]
-                    ax.fill_between(chrpos, ypos, y0, color=tracks[i].lc, lw=tracks[i].lw, zorder=2)
+                    print(len(ypos))
+                    trackcolor = ["red" if t <= .6 else "black" if t < 1.4 else "blue" for t in tpos]
+                    #print(trackcolor)
+                    #print(tpos)
+                    #ax.fill_between(chrpos, ypos, y0, color=trackcolor, lw=tracks[i].lw, zorder=2)
+                    ax.scatter(chrpos, ypos, s=6, c=trackcolor)
                     if not itx:
                         xpos = chrlengths[0][1][chrs[j]] + margin if maxl == -1 else maxl + margin
                         ax.text(xpos, y0 + diff/2, tracks[i].n, color=tracks[i].nc, fontsize=tracks[i].ns, fontfamily=tracks[i].nf, ha='left', va='center', rotation='horizontal')
