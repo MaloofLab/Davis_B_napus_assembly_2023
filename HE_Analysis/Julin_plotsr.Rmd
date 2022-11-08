@@ -269,9 +269,9 @@ DaAe.plotsr <- DaAe.plotsr %>%
          q.start.new=ifelse(strand=="-", q.end, q.start),
          q.end=ifelse(strand=="-", q.start, q.end),
          q.start=q.start.new,
-         ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3), "TRANS", "SYN")#,
-   #      ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
-  #       ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann )
+         ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3),
+                    str_c("TRANS-", r.chrom), #add the ancestral chrom # for plotting. 
+                    "SYN")
   ) %>%
   select(-pct.id, -ref.len, -strand, -q.start.new) %>%
   arrange(r.chrom, r.start)
@@ -314,9 +314,9 @@ others.plotsr <- others.plotsr %>%
              q.start.new=ifelse(strand=="-", q.end, q.start),
              q.end=ifelse(strand=="-", q.start, q.end),
              q.start=q.start.new,
-             ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3), "TRANS", "SYN")#,
-           #  ann=ifelse(strand=="-" & ann=="SYN", "INV", ann ),
-            # ann=ifelse(strand=="-" & ann=="TRANS", "INVTR", ann ),
+             ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3),
+                        str_c("TRANS-", q.chrom), 
+                        "SYN")
              ) %>%
       select(-pct.id, -ref.len, -q.start.new, -strand) %>%
       arrange(r.chrom, r.start)
@@ -373,7 +373,14 @@ Clustered_All %>% filter(Assembly=="ZS11", !is.na(Consensus)) %>%
   write_tsv("plotsr/ZS11Cov.bedgraph", col_names = FALSE)
 ```
 
-## create tracksinfo gile
+```{r}
+Clustered_All %>% filter(Assembly=="ZS11", !is.na(Consensus)) %>%
+  group_by(Chromosome) %>%
+  summarize(max=max(Consensus))
+```
+
+
+## create tracksinfo file
 
 ```{r}
 tibble(`#file`="DaAeCov.bedgraph", name="DaAE_Coverage", tags="ft:bedgraph;bw:10000") %>%
