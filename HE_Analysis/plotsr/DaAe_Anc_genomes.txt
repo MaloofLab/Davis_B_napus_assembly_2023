@@ -1,0 +1,3 @@
+#file	name	tag
+DaAe.chrlen	DaAe	ft:cl
+Ancestral.chrlen	Ancestral	ft:cl

@@ -1,0 +1,4 @@
+#file	name	tag
+QuintaA.chrlen	QuintaA	ft:cl
+Ancestral.chrlen	Ancestral	ft:cl
+DaAe.chrlen	DaAe	ft:cl

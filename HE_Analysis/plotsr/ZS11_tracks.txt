@@ -1,0 +1,2 @@
+#file	name	tags
+ZS11_cov.bedgraph	DaAe_coverage_on_ZS11	ft:bedgraph;bw:10000

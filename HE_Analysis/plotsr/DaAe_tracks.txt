@@ -1,0 +1,2 @@
+#file	name	tags
+DaAe_cov.bedgraph	DaAe_coverage_on_DaAe	ft:bedgraph;bw:10000

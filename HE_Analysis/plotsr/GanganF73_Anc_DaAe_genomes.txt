@@ -1,0 +1,4 @@
+#file	name	tag
+GanganF73.chrlen	GanganF73	ft:cl
+Ancestral.chrlen	Ancestral	ft:cl
+DaAe.chrlen	DaAe	ft:cl

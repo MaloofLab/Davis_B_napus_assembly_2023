@@ -1,4 +1,3 @@
 #file	name	tag
-DaAe.chrlen	DaAe	ft:cl
 Ancestral.chrlen	Ancestral	ft:cl
-ZS11.chrlen	ZS11	ft:cl
+DaAe.chrlen	DaAe	ft:cl

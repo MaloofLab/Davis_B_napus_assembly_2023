@@ -1,0 +1,4 @@
+#file	name	tag
+No2127.chrlen	No2127	ft:cl
+Ancestral.chrlen	Ancestral	ft:cl
+DaAe.chrlen	DaAe	ft:cl

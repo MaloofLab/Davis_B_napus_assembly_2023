@@ -1,2 +1,0 @@
-#file	name	tags
-ZS11Cov.bedgraph	ZS11_Coverage	ft:bedgraph;bw:10000

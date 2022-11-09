@@ -1,0 +1,4 @@
+#file	name	tag
+Darmor-Bzh_V10.chrlen	Darmor-Bzh_V10	ft:cl
+Ancestral.chrlen	Ancestral	ft:cl
+DaAe.chrlen	DaAe	ft:cl

@@ -1,0 +1,2 @@
+#file	name	tags
+Darmor-Bzh_V10_cov.bedgraph	DaAe_coverage_on_Darmor-Bzh_V10	ft:bedgraph;bw:10000

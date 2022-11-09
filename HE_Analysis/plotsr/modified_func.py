@@ -1651,7 +1651,6 @@ def drawtracks(ax, tracks, s, chrgrps, chrlengths, v, itx, cfg, minl=0, maxl=-1)
                 if not v:
                     y0 = cl - j - th*(i+1) if not itx else 1 - th*(i+1)
                     ypos = [(t*diff/tposmax)+y0 for t in tpos]
-                    print(len(ypos))
                     trackcolor = ["red" if t <= .6 else "black" if t < 1.4 else "blue" for t in tpos]
                     #print(trackcolor)
                     #print(tpos)

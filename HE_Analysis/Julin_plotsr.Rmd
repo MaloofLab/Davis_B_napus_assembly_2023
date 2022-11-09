@@ -15,6 +15,7 @@ Plotting HE exchange (and coverage?) with [plotsr](https://github.com/schneeberg
 library(tidyverse)
 library(GenomicRanges)
 library(Biostrings)
+library(reticulate)
 ```
 
 
@@ -54,30 +55,23 @@ chrom.lengths %>% unnest(lengths) %>%  pull(chrom) %>% unique()
 
 ## genome info
 
+Need a separate `genomes.txt` file for each plot that we want to make
 ```{r}
 genome.info <- tibble(`#file` = dir("plotsr", pattern="chrlen"),
                       name = str_remove(`#file`, "\\.chrlen"),
-                      tag = "ft:cl") 
+                      tag = "ft:cl")  %>%
+  filter(! (name %in% c("Boleracea",
+                        "Brapa",
+                        "Darmor-Bzh_V4.1",
+                        "pseudo_napus")
+  )  )
 
-# get order right
-positions <- match(c("DaAe", "Ancestral", "ZS11"), genome.info$name)
-
-genome.info <- genome.info[positions,]
-
-genome.info
-
-write_tsv(genome.info, "plotsr/genomes.txt")
-
-# get order right (flipped)
-positions <- match(c("ZS11", "Ancestral", "DaAe"), genome.info$name)
-
-genome.info <- genome.info[positions,]
-
-genome.info
-
-write_tsv(genome.info, "plotsr/genomes_rev.txt")
-
-
+for(g in str_subset(genome.info$name, "Ancestral|DaAe", negate = TRUE)) {
+  positions <- match(c(g, "Ancestral", "DaAe"), genome.info$name)
+  write_tsv(genome.info[positions,], 
+            str_c("plotsr/",g,"_Anc_DaAe_genomes.txt")
+  )
+}
 ```
 
 # synteny and rearrangement files:
@@ -233,6 +227,8 @@ These columns are needed:
 * Query end position
 * Annotation type
 
+Also, plotsr is zero based and the files are 1 based, so need to subtract 1.
+
 for each pairwise comparison need to create a BEDPE comparison file.  In these files, "reference" would be the upper genome in the plot and "query" will be the lower.  So DaAe will be handled separately from the rest.  For DaAe, DaAe is the query, and Ancestral is the reference  For all others, Ancestral is the query and the B. napus is the reference.
 
 ```{r}
@@ -263,7 +259,11 @@ DaAe.plotsr <- DaAe.plotsr %>%
 
 DaAe.plotsr <- DaAe.plotsr %>%
   filter(pct.id > 90, ref.len > 100) %>%
-  mutate(q.chrom=str_remove(q.chrom, "DaAe-"),
+  mutate(r.start = r.start - 1,
+         r.end = r.end -1,
+         q.start = q.start -1,
+         q.end = q.end -1,
+         q.chrom=str_remove(q.chrom, "DaAe-"),
          r.chrom=str_remove(r.chrom, "Anc-"),
          r.chrom=str_replace(r.chrom, "C([1-9])", "C0\\1"),
          q.start.new=ifelse(strand=="-", q.end, q.start),
@@ -295,19 +295,23 @@ others.plotsr <- plotsr %>%
 others.plotsr <- others.plotsr %>%
   mutate(plotsr.out = map(plotsr.out, function(x) {
     x %>% 
-  select(r.chrom=to.GR.seqnames,
-         r.start=to.GR.start,
-         r.end=to.GR.end,
-         strand,
-         q.chrom=seqnames,
-         q.start=start,
-         q.end=end,
-         pct.id,
-         ref.len) %>%
+      select(r.chrom=to.GR.seqnames,
+             r.start=to.GR.start,
+             r.end=to.GR.end,
+             strand,
+             q.chrom=seqnames,
+             q.start=start,
+             q.end=end,
+             pct.id,
+             ref.len) %>%
       
       filter(pct.id > 90, ref.len > 100) %>%
       
-      mutate(q.chrom=str_remove(q.chrom, "Anc-"),
+      mutate(r.start = r.start - 1,
+             r.end = r.end -1,
+             q.start = q.start -1,
+             q.end = q.end -1,
+             q.chrom=str_remove(q.chrom, "Anc-"),
              r.chrom=str_replace(r.chrom, "C([1-9])", "C0\\1"),
              r.chrom=str_replace(r.chrom, "^.*([AC][0-9]{1,2})$", "\\1"),
              q.chrom=str_replace(q.chrom, "C([1-9])", "C0\\1"),
@@ -317,7 +321,7 @@ others.plotsr <- others.plotsr %>%
              ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3),
                         str_c("TRANS-", q.chrom), 
                         "SYN")
-             ) %>%
+      ) %>%
       select(-pct.id, -ref.len, -q.start.new, -strand) %>%
       arrange(r.chrom, r.start)
     
@@ -352,72 +356,151 @@ others.plotsr$plotsr.out[[9]] %>%
   summarize(maxqstart=max(q.start), maxqend=max(q.end))
 ```
 
+## Special Cases
+
+For DaAe Coverage on itself, we need to plot DaAe_Anc
+```{r}
+#genome file for DaAe_Anc:
+positions <- match(c("DaAe", "Ancestral"), genome.info$name)
+  write_tsv(genome.info[positions,], "plotsr/DaAe_Anc_genomes.txt")
+
+#reverse query and reference for DaAe:
+DaAe.plotsr %>%
+  select(r.chrom = q.chrom, 
+         r.start=q.start, 
+         r.end=q.end, 
+         q.chrom=r.chrom, 
+         q.start=r.start, 
+         q.end=r.end,
+         ann) %>%
+  arrange(r.chrom, r.start) %>%
+write_tsv("plotsr/DaAe_Ancestral.bedpe", col_names = FALSE)
+```
+
+For DaAe Coverage on Ancestral, we need to plot Anc_DaAe
+
+```{r}
+#genome file for DaAe_Anc:
+positions <- match(c("Ancestral", "DaAe"), genome.info$name)
+  write_tsv(genome.info[positions,], "plotsr/Anc_DaAe_genomes.txt")
+```
+
 
 # Add coverages
 
+## Create coverage bedgraph files and tracksinfo files.
 ```{r}
 load("Julin_Coverages_and_Positions_median.RData")
-str(Clustered_All)
-Clustered_All <- Clustered_All %>%   mutate(Chromosome=str_remove(Chromosome, "chr"))
-levels(Clustered_All$Assembly)
+Clustered_All <- Clustered_All %>%   mutate(Chromosome=str_remove(Chromosome, "chr"),
+                                            Assembly=str_replace(Assembly, "Pseudo_napus", "Ancestral"))
+unique(Clustered_All$Assembly)
 unique(Clustered_All$Chromosome)
 ```
 
 ```{r}
-Clustered_All %>% filter(Assembly=="DaAe", !is.na(Consensus)) %>%
-  select(Chromosome, Start, End, Consensus) %>%
-  write_tsv("plotsr/DaAeCov.bedgraph", col_names = FALSE)
-
-Clustered_All %>% filter(Assembly=="ZS11", !is.na(Consensus)) %>%
-  select(Chromosome, Start, End, Consensus) %>%
-  write_tsv("plotsr/ZS11Cov.bedgraph", col_names = FALSE)
-```
-
-```{r}
-Clustered_All %>% filter(Assembly=="ZS11", !is.na(Consensus)) %>%
-  group_by(Chromosome) %>%
-  summarize(max=max(Consensus))
-```
-
-
-## create tracksinfo file
-
-```{r}
-tibble(`#file`="DaAeCov.bedgraph", name="DaAE_Coverage", tags="ft:bedgraph;bw:10000") %>%
-  write_tsv("plotsr/DaAeTracks.txt")
-
-tibble(`#file`="ZS11Cov.bedgraph", name="ZS11_Coverage", tags="ft:bedgraph;bw:10000") %>%
-  write_tsv("plotsr/ZS11Tracks.txt")
+for(a in unique(Clustered_All$Assembly)) {
+  Clustered_All %>% filter(Assembly==a, !is.na(Consensus)) %>%
+    select(Chromosome, Start, End, Consensus) %>%
+    write_tsv(str_c("plotsr/", a, "_cov.bedgraph"), col_names = FALSE)
+  
+  tibble(`#file`=str_c(a, "_cov.bedgraph"), 
+         name=str_c("DaAe_coverage_on_", a),
+         tags="ft:bedgraph;bw:10000") %>%
+    write_tsv(str_c("plotsr/", a, "_tracks.txt"))
+}
 ```
 
 # plot it
 
+Move modified func.py into place.  Change the path below to match your system.
+```{r, eval=FALSE}
+if(!(file.exists("/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py.bak"))) 
+  file.copy("/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py", "/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py.bak")
+
+file.copy("plotsr/modified_func.py", "/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py", overwrite = TRUE)
+
+#file.copy("plotsr/jm_func.py", "/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py", overwrite = TRUE)
+```
+
+
+plot those with coverage tracks
 ```{bash}
 cd plotsr
 
-source ~/.zshrc
+mkdir plots
+
+source ~/.bash_profile
 
 conda activate plotsr
 
+params_cov="--itx --cfg base.cfg -H 4 -W 12 -S 0.5 "
+
+# plot the comparisons where we have coverage:
+glist="Darmor-Bzh_V10 ZS11"
+for g in ${glist}
+do
+echo $g
 plotsr --itx \
---bp ZS11_Ancestral.bedpe \
+--bp ${g}_Ancestral.bedpe \
 --bp Ancestral_DaAe.bedpe \
---genomes genomes_rev.txt \
--R -W 12 -H 4 
+--genomes ${g}_Anc_DaAe_genomes.txt \
+--tracks ${g}_tracks.txt \
+-o plots/${g}_Anc_DaAe_cov.pdf \
+${params_cov}
+done
 ```
 
-plot with tracks
+plot special cases
 ```{bash}
 cd plotsr
 
-source ~/.zshrc
+source ~/.bash_profile
 
 conda activate plotsr
 
+params_cov="--itx --cfg base.cfg -H 4 -W 12 -S 0.5 "
+
 plotsr --itx \
---bp ZS11_Ancestral.bedpe \
+--bp DaAe_Ancestral.bedpe \
+--genomes DaAe_Anc_genomes.txt \
+--tracks DaAe_tracks.txt \
+-o plots/DaAe_Anc_cov.pdf \
+${params_cov}
+
+plotsr --itx \
 --bp Ancestral_DaAe.bedpe \
---genomes genomes_rev.txt \
---tracks ZS11Tracks.txt \
--R -W 12 -H 4 
+--genomes Anc_DaAe_genomes.txt \
+--tracks Ancestral_tracks.txt \
+-o plots/Anc_DaAe_cov.pdf \
+${params_cov}
+
 ```
+
+plot those without coverage tracks
+```{bash}
+cd plotsr
+
+mkdir plots
+
+source ~/.bash_profile
+
+conda activate plotsr
+
+params_cov="--itx --cfg base.cfg -H 4 -W 12 -S 0.75 "
+
+# plot the comparisons where we do not have coverage:
+glist="GangfanF73 No2127 QuintaA Shengli3 Tapidor Westar Zheyou73"
+for g in ${glist}
+do
+echo $g
+plotsr --itx \
+--bp ${g}_Ancestral.bedpe \
+--bp Ancestral_DaAe.bedpe \
+--genomes ${g}_Anc_DaAe_genomes.txt \
+-o plots/${g}_Anc_DaAe.pdf \
+${params_cov}
+done
+```
+
+plot specific regions:
+
