@@ -19,11 +19,11 @@ Coverage_Readin <- function(filename){
                    col_names = coverage_columns,
                    delim = "\t",
                    skip = 2) %>%
-    mutate(Adjusted_Coverage = round(Reads / Size, 2),
+    mutate(Adjusted_Coverage = round(Reads / Size, 3),
            Position = floor((End + Start) / 2)) %>%
     mutate(Genome_Average = median(ifelse(Adjusted_Coverage>4,NA,Adjusted_Coverage), na.rm = T),
            Genome_SD = sd(Adjusted_Coverage, na.rm = T),
-           Relative_Coverage = round(Adjusted_Coverage / Genome_Average, 2),
+           Relative_Coverage = round(Adjusted_Coverage / Genome_Average, 3),
            Relative_Coverage = ifelse(Relative_Coverage >= 10, NA, Relative_Coverage),
            Std_Relative_Coverage = scale(Relative_Coverage))
   return(df)
@@ -54,16 +54,16 @@ DaAe_Coverage$Assembly <- "DaAe"
 ## Clustering a bit
 
 ```{r}
-# Set the value of each point equal to most frequent rounded value in 20 neighbors will have to burn in 10
+# Set the value of each point equal to median value in 20 neighbors will have to burn in 10
 Clustered_Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_Pseudo_napus_Coverage)-10)){
-  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Pseudo_napus_Coverage$Consensus[i-1]
-  Clustered_Pseudo_napus_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Pseudo_napus_Coverage$Consensus[i] <- mean(Winner)
 }
 
 # Factor in Napus
@@ -72,11 +72,11 @@ Clustered_DaAe_Coverage <- DaAe_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
-  Neighbors <- round(Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_DaAe_Coverage$Consensus[i-1]
-  Clustered_DaAe_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_DaAe_Coverage$Consensus[i] <- mean(Winner)
 }
 
 Clustered_All <- rbind(Clustered_Pseudo_napus_Coverage, Clustered_DaAe_Coverage)
@@ -190,11 +190,11 @@ Clustered_Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
   mutate(Consensus = NA)
 
 for(i in 11:(nrow(Clustered_Pseudo_napus_Coverage)-10)){
-  Neighbors <- round(Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Pseudo_napus_Coverage$Consensus[i-1]
-  Clustered_Pseudo_napus_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Pseudo_napus_Coverage$Consensus[i] <- mean(Winner)
 }
 
 # Factor in Napus
@@ -231,83 +231,83 @@ Clustered_Zheyou73_Coverage <- Zheyou73_Coverage %>%
 
 
 for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
-  Neighbors <- round(Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_DaAe_Coverage$Consensus[i-1]
-  Clustered_DaAe_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_DaAe_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_ZS11_Coverage)-10)){
-  Neighbors <- round(Clustered_ZS11_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_ZS11_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_ZS11_Coverage$Consensus[i-1]
-  Clustered_ZS11_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_ZS11_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_Darmor_Bzh_V10_Coverage)-10)){
-  Neighbors <- round(Clustered_Darmor_Bzh_V10_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Darmor_Bzh_V10_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Darmor_Bzh_V10_Coverage$Consensus[i-1]
-  Clustered_Darmor_Bzh_V10_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Darmor_Bzh_V10_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_GanganF73_Coverage)-10)){
-  Neighbors <- round(Clustered_GanganF73_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_GanganF73_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_GanganF73_Coverage$Consensus[i-1]
-  Clustered_GanganF73_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_GanganF73_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_No2127_Coverage)-10)){
-  Neighbors <- round(Clustered_No2127_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_No2127_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_No2127_Coverage$Consensus[i-1]
-  Clustered_No2127_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_No2127_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_QuintaA_Coverage)-10)){
-  Neighbors <- round(Clustered_QuintaA_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_QuintaA_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_QuintaA_Coverage$Consensus[i-1]
-  Clustered_QuintaA_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_QuintaA_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_Shengli3_Coverage)-10)){
-  Neighbors <- round(Clustered_Shengli3_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Shengli3_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Shengli3_Coverage$Consensus[i-1]
-  Clustered_Shengli3_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Shengli3_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_Tapidor_Coverage)-10)){
-  Neighbors <- round(Clustered_Tapidor_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Tapidor_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Tapidor_Coverage$Consensus[i-1]
-  Clustered_Tapidor_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Tapidor_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_Westar_Coverage)-10)){
-  Neighbors <- round(Clustered_Westar_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Westar_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Westar_Coverage$Consensus[i-1]
-  Clustered_Westar_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Westar_Coverage$Consensus[i] <- mean(Winner)
 }
 
 for(i in 11:(nrow(Clustered_Zheyou73_Coverage)-10)){
-  Neighbors <- round(Clustered_Zheyou73_Coverage$Relative_Coverage[(i-10):(i+10)],1)
+  Neighbors <- Clustered_Zheyou73_Coverage$Relative_Coverage[(i-10):(i+10)]
   #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
   Winner <- median(Neighbors, na.rm = T)
   if(is_empty(Winner)) Winner <- Clustered_Zheyou73_Coverage$Consensus[i-1]
-  Clustered_Zheyou73_Coverage$Consensus[i] <- round(mean(Winner),1)
+  Clustered_Zheyou73_Coverage$Consensus[i] <- mean(Winner)
 }
 
 Clustered_All <- rbind(Clustered_Pseudo_napus_Coverage,
