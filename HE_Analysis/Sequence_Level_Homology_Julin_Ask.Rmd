@@ -116,212 +116,54 @@ for (i in chroms) {
 
 # Add in more napus genomes
 
+
+
+
+Read in the coverages
 ```{r}
-Pseudo_napus_Coverage <- Coverage_Readin("Combined_Coverages/Combined_pseudo_napus_Coverage.tsv.gz")
-DaAe_Coverage <- Coverage_Readin("Combined_Coverages/Combined_DaAe_Coverage.tsv.gz")
-ZS11_Coverage <- Coverage_Readin("Combined_Coverages/Combined_ZS11_Coverage.tsv.gz")
-Darmor_Bzh_V10_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Darmor-Bzh_V10_Coverage.tsv.gz")
-GanganF73_Coverage <- Coverage_Readin("Combined_Coverages/Combined_GanganF73_Coverage.tsv.gz")
-No2127_Coverage <- Coverage_Readin("Combined_Coverages/Combined_No2127_Coverage.tsv.gz")
-QuintaA_Coverage <- Coverage_Readin("Combined_Coverages/Combined_QuintaA_Coverage.tsv.gz")
-Shengli3_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Shengli3_Coverage.tsv.gz")
-Tapidor_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Tapidor_Coverage.tsv.gz")
-Westar_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Westar_Coverage.tsv.gz")
-Zheyou73_Coverage <- Coverage_Readin("Combined_Coverages/Combined_Zheyou73_Coverage.tsv.gz")
+All_Coverage <- tibble(path=dir("Combined_Coverages", pattern = "Combine.*Coverage.tsv.gz", full.names = TRUE)) %>%
+  filter(str_detect(path, "Boleracea|Brapa|Gene|V4", negate = TRUE)) # filter away files we do not want
+
+All_Coverage <- All_Coverage %>%
+  mutate(coverage=map(path, Coverage_Readin))
 ```
 
-# Format the data a bit
+Format the data a bit and unnest
 
 ```{r}
-Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
-  mutate(Assembly = "Pseudo_napus",
-         Chromosome = ifelse(grepl("C", Chromosome),
-                             str_replace(Chromosome, "C", "chrC0"),
-                             paste0("chr",Chromosome))
-  )
-DaAe_Coverage$Assembly <- "DaAe"
-ZS11_Coverage <- ZS11_Coverage %>%
-  mutate(Assembly = "ZS11",
-         Chromosome = str_replace(Chromosome, "scaffold", "chr"))
-Darmor_Bzh_V10_Coverage <- Darmor_Bzh_V10_Coverage %>%
-  mutate(Assembly = "Darmor-Bzh_V10",
-         Chromosome = str_c("chr", Chromosome))
-GanganF73_Coverage <- GanganF73_Coverage %>%
-  mutate(Assembly = "GanganF73",
-         Chromosome = str_replace(Chromosome, "ganganF73v0_", "chr"))
-No2127_Coverage <- No2127_Coverage %>%
-  mutate(Assembly = "No2127",
-         Chromosome = str_replace(Chromosome, "no2127v0_", "chr"))
-QuintaA_Coverage <- QuintaA_Coverage %>%
-  mutate(Assembly = "QuintaA",
-         Chromosome = str_replace(Chromosome, "quintaAv0_", "chr"))
-Shengli3_Coverage <- Shengli3_Coverage %>%
-  mutate(Assembly = "Shengli3",
-         Chromosome = str_replace(Chromosome, "shengli3v0_", "chr"))
-Tapidor_Coverage <- Tapidor_Coverage %>%
-  mutate(Assembly = "Tapidor",
-         Chromosome = str_replace(Chromosome, "tapidor3v0_", "chr"))
-Westar_Coverage <- Westar_Coverage %>%
-  mutate(Assembly = "Westar",
-         Chromosome = str_replace(Chromosome, "westarv0_", "chr"))
-Zheyou73_Coverage <- Zheyou73_Coverage %>%
-  mutate(Assembly = "Zheyou73",
-         Chromosome = str_replace(Chromosome, "zheyou73v0_", "chr"))
+#Create column for assembly names
+All_Coverage <- All_Coverage %>%
+  mutate(Assembly = str_remove_all(path, "(Combined_Coverages/Combined_|_Coverage.tsv.gz)"),
+         Assembly = str_replace(Assembly, "pseudo", "Pseudo")) %>% # match rest of code
+  select(Assembly, coverage) 
 
-All_Coverage <- rbind(Pseudo_napus_Coverage,
-                      DaAe_Coverage,
-                      ZS11_Coverage,
-                      Darmor_Bzh_V10_Coverage,
-                      GanganF73_Coverage,
-                      No2127_Coverage,
-                      QuintaA_Coverage,
-                      Shengli3_Coverage,
-                      Tapidor_Coverage,
-                      Westar_Coverage,
-                      Zheyou73_Coverage)
+#Fix chromosome names
+All_Coverage <- All_Coverage %>%
+  mutate(coverage = map(coverage, mutate, Chromosome=str_extract(Chromosome, "[AC][0-9]{1,2}")),
+         coverage = map(coverage, mutate, Chromosome=str_replace(Chromosome, "C([1-9])", "C0\\1")))
+
+All_Coverage <- All_Coverage %>% unnest(coverage)
 ```
-
 
 ## Clustering a bit
 
 ```{r}
 # Set the value of each point equal to most frequent rounded value in 20 neighbors will have to burn in 10
-Clustered_Pseudo_napus_Coverage <- Pseudo_napus_Coverage %>%
-  mutate(Consensus = NA)
 
-for(i in 11:(nrow(Clustered_Pseudo_napus_Coverage)-10)){
-  Neighbors <- Clustered_Pseudo_napus_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_Pseudo_napus_Coverage$Consensus[i-1]
-  Clustered_Pseudo_napus_Coverage$Consensus[i] <- mean(Winner)
+cluster_coverage <- function(relcov) {
+  Consensus <- rep(NaN, length(relcov))
+  for(i in 11:(length(relcov)-10)){
+    Neighbors <- relcov[(i-10):(i+10)]
+    Winner <- median(Neighbors, na.rm = T)
+    if(is_empty(Winner)) Winner <- Consensus[i-1]
+    Consensus[i] <- mean(Winner)
+  }
+  Consensus
 }
 
-# Factor in Napus
-
-Clustered_DaAe_Coverage <- DaAe_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_ZS11_Coverage <- ZS11_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_Darmor_Bzh_V10_Coverage <- Darmor_Bzh_V10_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_GanganF73_Coverage <- GanganF73_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_No2127_Coverage <- No2127_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_QuintaA_Coverage <- QuintaA_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_Shengli3_Coverage <- Shengli3_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_Tapidor_Coverage <- Tapidor_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_Westar_Coverage <- Westar_Coverage %>%
-  mutate(Consensus = NA)
-
-Clustered_Zheyou73_Coverage <- Zheyou73_Coverage %>%
-  mutate(Consensus = NA)
-
-
-for(i in 11:(nrow(Clustered_DaAe_Coverage)-10)){
-  Neighbors <- Clustered_DaAe_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_DaAe_Coverage$Consensus[i-1]
-  Clustered_DaAe_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_ZS11_Coverage)-10)){
-  Neighbors <- Clustered_ZS11_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_ZS11_Coverage$Consensus[i-1]
-  Clustered_ZS11_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_Darmor_Bzh_V10_Coverage)-10)){
-  Neighbors <- Clustered_Darmor_Bzh_V10_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_Darmor_Bzh_V10_Coverage$Consensus[i-1]
-  Clustered_Darmor_Bzh_V10_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_GanganF73_Coverage)-10)){
-  Neighbors <- Clustered_GanganF73_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_GanganF73_Coverage$Consensus[i-1]
-  Clustered_GanganF73_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_No2127_Coverage)-10)){
-  Neighbors <- Clustered_No2127_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_No2127_Coverage$Consensus[i-1]
-  Clustered_No2127_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_QuintaA_Coverage)-10)){
-  Neighbors <- Clustered_QuintaA_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_QuintaA_Coverage$Consensus[i-1]
-  Clustered_QuintaA_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_Shengli3_Coverage)-10)){
-  Neighbors <- Clustered_Shengli3_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_Shengli3_Coverage$Consensus[i-1]
-  Clustered_Shengli3_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_Tapidor_Coverage)-10)){
-  Neighbors <- Clustered_Tapidor_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_Tapidor_Coverage$Consensus[i-1]
-  Clustered_Tapidor_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_Westar_Coverage)-10)){
-  Neighbors <- Clustered_Westar_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_Westar_Coverage$Consensus[i-1]
-  Clustered_Westar_Coverage$Consensus[i] <- mean(Winner)
-}
-
-for(i in 11:(nrow(Clustered_Zheyou73_Coverage)-10)){
-  Neighbors <- Clustered_Zheyou73_Coverage$Relative_Coverage[(i-10):(i+10)]
-  #winner <- as.numeric(names(table(neighbors))[table(neighbors)==max(table(neighbors))])
-  Winner <- median(Neighbors, na.rm = T)
-  if(is_empty(Winner)) Winner <- Clustered_Zheyou73_Coverage$Consensus[i-1]
-  Clustered_Zheyou73_Coverage$Consensus[i] <- mean(Winner)
-}
-
-Clustered_All <- rbind(Clustered_Pseudo_napus_Coverage,
-                       Clustered_DaAe_Coverage,
-                       Clustered_ZS11_Coverage,
-                       Clustered_Darmor_Bzh_V10_Coverage,
-                       Clustered_GanganF73_Coverage,
-                       Clustered_No2127_Coverage,
-                       Clustered_QuintaA_Coverage,
-                       Clustered_Shengli3_Coverage,
-                       Clustered_Tapidor_Coverage,
-                       Clustered_Westar_Coverage,
-                       Clustered_Zheyou73_Coverage)
-Clustered_All$Assembly <- factor(Clustered_All$Assembly, levels = c("Pseudo_napus", "DaAe", "ZS11", "Darmor-Bzh_V10", "GanganF73", "No2127", "QuintaA", "Shengli3", "Tapidor", "Westar", "Zheyou73"))
+Clustered_All <- All_Coverage %>%
+  group_by(Assembly, Chromosome) %>%
+  mutate(Consensus = cluster_coverage(Relative_Coverage))
 ```
 
 # organize HE positions
@@ -342,12 +184,12 @@ unique(comparisons$assembly)
 
 ```{r}
 HEpos <- comparisons %>% 
-  filter(assembly %in% levels(Clustered_All$Assembly)) %>%
+  filter(assembly %in% unique(Clustered_All$Assembly)) %>%
   select(Assembly=assembly, links) %>% 
   unnest(links) %>%
   mutate(Start=ref.start, 
          End=ref.end,
-         Chromosome=str_replace(ref.name, "^.*([AC][0-9]{1,2})", "chr\\1"))
+         Chromosome=str_replace(ref.name, "^.*([AC][0-9]{1,2})", "\\1"))
 
 HEpos
 
@@ -415,7 +257,7 @@ All_Positions <- rbind(DA_DaAe_Positions, DA_ZS11_Positions, DA_Darmor_Bzh_V10_P
 # Plot
 
 ```{r}
-chroms <- c(paste0("chrA0",1:9), "chrA10", paste0("chrC0", 1:9))
+chroms <- unique(Clustered_All$Chromosome)
 for (i in chroms) {
   Clustered_All %>% filter(Chromosome == i) %>%
     mutate(Consensus = ifelse(Consensus >= 4.5, 4.5, Consensus)) %>%
@@ -441,10 +283,8 @@ for (i in chroms) {
                  labels[[1]] <- paste("Assembly:", labels[[1]])
                  a <-  do.call(paste,c(labels, list(sep = "\n")))
                  list(gsub("_","",a))
-                 }) +
-    geom_text(data = All_Positions %>% filter(Chromosome == i),
-               aes(x = Position, y = Y, label = Shaped))
-  ggsave(paste0("Coverage_Plots_20221030/",i,".png"), width = 10, height = 10)
+                 }) 
+  ggsave(paste0("Coverage_Plots_20221113b/",i,".png"), width = 10, height = 10)
 }
 
 save(Clustered_All, All_Positions, file = "Julin_Coverages_and_Positions2_median.RData")
