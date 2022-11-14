@@ -268,8 +268,9 @@ DaAe.plotsr <- DaAe.plotsr %>%
          r.chrom=str_replace(r.chrom, "C([1-9])", "C0\\1"),
          q.start.new=ifelse(strand=="-", q.end, q.start),
          q.end=ifelse(strand=="-", q.start, q.end),
-         q.start=q.start.new,
-         ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3),
+         q.start=q.start.new) %>%
+    filter(r.chrom==q.chrom | str_sub(r.chrom,1,1) != str_sub(q.chrom, 1,1)) %>% # keep syntenic regions and HE between subgenomes
+    mutate(ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1,3),
                     str_c("TRANS-", r.chrom), #add the ancestral chrom # for plotting. 
                     "SYN")
   ) %>%
@@ -317,8 +318,9 @@ others.plotsr <- others.plotsr %>%
              q.chrom=str_replace(q.chrom, "C([1-9])", "C0\\1"),
              q.start.new=ifelse(strand=="-", q.end, q.start),
              q.end=ifelse(strand=="-", q.start, q.end),
-             q.start=q.start.new,
-             ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3),
+             q.start=q.start.new) %>%
+          filter(r.chrom==q.chrom | str_sub(r.chrom,1,1) != str_sub(q.chrom, 1,1)) %>% # keep syntenic regions and HE between subgenomes
+      mutate(ann=ifelse(str_sub(r.chrom, 1, 3) != str_sub(q.chrom, 1, 3),
                         str_c("TRANS-", q.chrom), 
                         "SYN")
       ) %>%
@@ -468,7 +470,7 @@ source ~/.bash_profile
 
 conda activate plotsr
 
-params_cov="--itx --cfg base.cfg -H 10 -W 10 -S 0.5 "
+params_cov="--itx --cfg base.cfg -H 6 -W 12 -S 0.5 "
 
 plotsr \
 --bp DaAe_Ancestral.bedpe \
@@ -486,29 +488,7 @@ ${params_cov}
 
 ```
 
-plot those without coverage tracks
-```{bash}
-cd plotsr
 
-source ~/.bash_profile
-
-conda activate plotsr
-
-params_nocov="--itx --cfg base.cfg -H 8 -W 10 -S 0.75 "
-
-# plot the comparisons where we do not have coverage:
-glist="GanganF73 No2127 QuintaA Shengli3 Tapidor Westar Zheyou73"
-for g in ${glist}
-do
-echo $g
-plotsr \
---bp ${g}_Ancestral.bedpe \
---bp Ancestral_DaAe.bedpe \
---genomes ${g}_Anc_DaAe_genomes.txt \
--o plots/${g}_Anc_DaAe.pdf \
-${params_nocov}
-done
-```
 
 plot specific regions:
 
@@ -525,7 +505,87 @@ plotsr \
   --genomes ZS11_Anc_DaAe_genomes.txt \
   --tracks ZS11_tracks.txt \
   ${params_cov} --chr A01 --chr C01 \
-  -o plots/ZS11_Znc_DaAe_A01_C01.pdf
+  -o plots/ZS11_Anc_DaAe_A01_C01.pdf
+
+plotsr \
+  --bp No2127_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes No2127_Anc_DaAe_genomes.txt \
+  --tracks No2127_tracks.txt \
+  ${params_cov} --chr A02 --chr C02 \
+  -o plots/No2127_Anc_DaAe_A02_C02.pdf
+  
+plotsr \
+  --bp Zheyou73_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes Zheyou73_Anc_DaAe_genomes.txt \
+  --tracks Zheyou73_tracks.txt \
+  ${params_cov} --chr A02 --chr C02 \
+  -o plots/Zheyou73_Anc_DaAe_A02_C02.pdf
+  
+plotsr \
+  --bp Zheyou73_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes Zheyou73_Anc_DaAe_genomes.txt \
+  --tracks Zheyou73_tracks.txt \
+  ${params_cov} --chr A03 --chr C03 \
+  -o plots/Zheyou73_Anc_DaAe_A03_C03.pdf
+  
+plotsr \
+  --bp ZS11_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes ZS11_Anc_DaAe_genomes.txt \
+  --tracks ZS11_tracks.txt \
+  ${params_cov} --chr A09 --chr C08 \
+  -o plots/ZS11_Anc_DaAe_A09_C08.pdf
+  
+plotsr \
+  --bp Darmor-Bzh_V10_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes Darmor-Bzh_V10_Anc_DaAe_genomes.txt \
+  --tracks Darmor-Bzh_V10_tracks.txt \
+  ${params_cov} --chr A09 --chr C08 \
+  -o plots/Darmor-Bzh_V10_Anc_DaAe_A09_C08.pdf
+  
+plotsr \
+  --bp ZS11_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes ZS11_Anc_DaAe_genomes.txt \
+  --tracks ZS11_tracks.txt \
+  ${params_cov} --chr A10 --chr C09 \
+  -o plots/ZS11_Anc_DaAe_A10_C09.pdf
+  
+plotsr \
+  --bp Tapidor_Ancestral.bedpe \
+  --bp Tapidor_DaAe.bedpe \
+  --genomes Tapidor_Anc_DaAe_genomes.txt \
+  --tracks Tapidor_tracks.txt \
+  ${params_cov} --chr A02 --chr C02 \
+  -o plots/Tapidor_Anc_DaAe_A02_C02.pdf
+  
+plotsr \
+  --bp QuintaA_Ancestral.bedpe \
+  --bp QuintaA_DaAe.bedpe \
+  --genomes QuintaA_Anc_DaAe_genomes.txt \
+  --tracks QuintaA_tracks.txt \
+  ${params_cov} --chr A02 --chr C02 \
+  -o plots/QuintaA_Anc_DaAe_A02_C02.pdf
+  
+plotsr \
+  --bp QuintaA_Ancestral.bedpe \
+  --bp QuintaA_DaAe.bedpe \
+  --genomes QuintaA_Anc_DaAe_genomes.txt \
+  --tracks QuintaA_tracks.txt \
+  ${params_cov} --chr A05 --chr C05 \
+  -o plots/QuintaA_Anc_DaAe_A05_C05.pdf
+  
+plotsr \
+  --bp Zheyou73_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes Zheyou73_Anc_DaAe_genomes.txt \
+  --tracks Zheyou73_tracks.txt \
+  ${params_cov} --chr A05 --chr C05 \
+  -o plots/Zheyou73_Anc_DaAe_A05_C05.pdf
 ```
 
 
