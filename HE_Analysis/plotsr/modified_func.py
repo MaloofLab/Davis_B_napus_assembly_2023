@@ -613,7 +613,8 @@ class track():
                     continue
                 if curchr == '':
                     curchr = line[0]
-                    binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=float)
+                    #binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=float)
+                    binv = np.full(ceil(chrlengths[0][1][curchr]/bw), np.nan, dtype=float)
                     s = int(line[1])
                     e = int(line[2])
                     if s//bw == e//bw:
@@ -639,7 +640,8 @@ class track():
                     added_chrs.append(curchr)
                     # Set the new chromosome
                     curchr = line[0]
-                    binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=float)
+                    #binv = np.zeros(ceil(chrlengths[0][1][curchr]/bw), dtype=float)
+                    binv = np.full(ceil(chrlengths[0][1][curchr]/bw), np.nan, dtype=float)
                     s = int(line[1])
                     e = int(line[2])
                     if s//bw == e//bw:
@@ -1297,7 +1299,7 @@ def drawax(ax, chrgrps, chrlengths, v, s, cfg, itx, minl=0, maxl=-1, chrname=Non
     elif itx:
         MCHR = 0.01     # TODO : read spacing between neighbouring chromosome from config file
         maxchr = max([sum(chrlengths[i][1].values()) for i in range(len(chrlengths))])
-        maxl = int(maxchr/(MCHR + 1 - (MCHR*len(chrgrps))))
+        maxl = int(1.02*((maxchr/(MCHR + 1 - (MCHR*len(chrgrps))))))
         mchr = MCHR*maxl
         step = s/(len(chrlengths)-1)
         if not v:
@@ -1638,6 +1640,16 @@ def drawtracks(ax, tracks, s, chrgrps, chrlengths, v, itx, cfg, minl=0, maxl=-1)
 
         if tracks[i].ft in ['bed', 'bedgraph']:
             bedbin = tracks[i].bincnt
+            # Get the maximum value across all chromosomes
+            tposmax_all = 0
+            for tpchr in bedbin.values():
+                for tpv in tpchr:
+                    if np.isnan(tpv[1]):
+                        continue
+                    elif tpv[1] > tposmax_all:
+                        tposmax_all = tpv[1]
+            tposmax_all = tposmax_all*1.05 # Adjust to give a 5% buffer for nicer pltting.
+            print(tposmax_all)
             # Select positions that are within the limits
             for j in range(cl):
                 if maxl != -1:
@@ -1647,15 +1659,23 @@ def drawtracks(ax, tracks, s, chrgrps, chrlengths, v, itx, cfg, minl=0, maxl=-1)
                     chrpos = [k[0] if not itx else k[0] + rbuff[chrs[j]] for k in bedbin[chrs[j]]]
                     tpos = [k[1] for k in bedbin[chrs[j]]]
                 # print(cl, len(tpos))
-                tposmax = max(tpos)
+                # tposmax = max(tpos)
                 if not v:
                     y0 = cl - j - th*(i+1) if not itx else 1 - th*(i+1)
-                    ypos = [(t*diff/tposmax)+y0 for t in tpos]
+                    #ypos = [(t*diff/tposmax)+y0 for t in tpos]
+                    ypos = [(t*diff/tposmax_all)+y0 for t in tpos] #normalize all chromosomes the same.
                     trackcolor = ["red" if t <= .6 else "black" if t < 1.4 else "blue" for t in tpos]
                     #print(trackcolor)
                     #print(tpos)
                     #ax.fill_between(chrpos, ypos, y0, color=trackcolor, lw=tracks[i].lw, zorder=2)
-                    ax.scatter(chrpos, ypos, s=6, c=trackcolor)
+                    ax.scatter(chrpos, ypos, s=2, c=trackcolor)
+                    # add some hlines
+                    x0 = 0 if not itx else 0 + rbuff[chrs[j]]
+                    hlines = [(h*diff/tposmax_all) + y0 for h in [0, .5, 1, 1.5, 2]]
+                    ax.hlines(hlines, xmin=x0, xmax=x0+chrlengths[0][1][chrs[j]],
+                        colors=["red", "red", "black", "blue", "blue", "blue"],
+                        linestyles = ["solid", "dotted", "solid", "dotted", "solid"],
+                        linewidths = [1, .5, 1, .5, 1])
                     if not itx:
                         xpos = chrlengths[0][1][chrs[j]] + margin if maxl == -1 else maxl + margin
                         ax.text(xpos, y0 + diff/2, tracks[i].n, color=tracks[i].nc, fontsize=tracks[i].ns, fontfamily=tracks[i].nf, ha='left', va='center', rotation='horizontal')
@@ -1669,7 +1689,7 @@ def drawtracks(ax, tracks, s, chrgrps, chrlengths, v, itx, cfg, minl=0, maxl=-1)
             if itx:
                 if not v:
                     xpos = chrlengths[0][1][chrs[j]] + margin if maxl == -1 else maxl + margin
-                    ax.text(xpos, y0 + diff/2, tracks[i].n, color=tracks[i].nc, fontsize=tracks[i].ns, fontfamily=tracks[i].nf, ha='left', va='center', rotation='horizontal')
+                    #ax.text(xpos, y0 + diff/2, tracks[i].n, color=tracks[i].nc, fontsize=tracks[i].ns, fontfamily=tracks[i].nf, ha='left', va='center', rotation='horizontal')
                 else:
                     ypos = chrlengths[0][1][chrs[j]] + margin if maxl == -1 else maxl + margin
                     ax.text(x0 + diff/2, ypos, tracks[i].n, color=tracks[i].nc, fontsize=tracks[i].ns, fontfamily=tracks[i].nf, ha='center', va='bottom', rotation='vertical')
