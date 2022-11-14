@@ -1649,7 +1649,6 @@ def drawtracks(ax, tracks, s, chrgrps, chrlengths, v, itx, cfg, minl=0, maxl=-1)
                     elif tpv[1] > tposmax_all:
                         tposmax_all = tpv[1]
             tposmax_all = tposmax_all*1.05 # Adjust to give a 5% buffer for nicer pltting.
-            print(tposmax_all)
             # Select positions that are within the limits
             for j in range(cl):
                 if maxl != -1:
