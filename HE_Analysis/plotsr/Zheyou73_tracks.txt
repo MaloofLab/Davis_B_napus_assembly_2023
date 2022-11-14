@@ -1,0 +1,2 @@
+#file	name	tags
+Zheyou73_cov.bedgraph	DaAe_coverage_on_Zheyou73	ft:bedgraph;bw:20000

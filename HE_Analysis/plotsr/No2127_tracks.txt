@@ -1,0 +1,2 @@
+#file	name	tags
+No2127_cov.bedgraph	DaAe_coverage_on_No2127	ft:bedgraph;bw:20000

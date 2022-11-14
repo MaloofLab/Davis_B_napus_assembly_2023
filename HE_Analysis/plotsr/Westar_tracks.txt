@@ -1,0 +1,2 @@
+#file	name	tags
+Westar_cov.bedgraph	DaAe_coverage_on_Westar	ft:bedgraph;bw:20000

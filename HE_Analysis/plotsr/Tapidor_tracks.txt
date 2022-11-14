@@ -1,0 +1,2 @@
+#file	name	tags
+Tapidor_cov.bedgraph	DaAe_coverage_on_Tapidor	ft:bedgraph;bw:20000

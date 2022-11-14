@@ -1,0 +1,2 @@
+#file	name	tags
+Shengli3_cov.bedgraph	DaAe_coverage_on_Shengli3	ft:bedgraph;bw:20000

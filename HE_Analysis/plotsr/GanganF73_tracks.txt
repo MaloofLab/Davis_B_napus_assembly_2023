@@ -1,0 +1,2 @@
+#file	name	tags
+GanganF73_cov.bedgraph	DaAe_coverage_on_GanganF73	ft:bedgraph;bw:20000

@@ -1,2 +1,2 @@
 #file	name	tags
-Ancestral_cov.bedgraph	DaAe_coverage_on_Ancestral	ft:bedgraph;bw:10000
+Ancestral_cov.bedgraph	DaAe_coverage_on_Ancestral	ft:bedgraph;bw:20000

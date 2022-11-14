@@ -1,0 +1,2 @@
+#file	name	tags
+QuintaA_cov.bedgraph	DaAe_coverage_on_QuintaA	ft:bedgraph;bw:20000
