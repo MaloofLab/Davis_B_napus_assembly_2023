@@ -362,7 +362,7 @@ For DaAe Coverage on itself, we need to plot DaAe_Anc
 ```{r}
 #genome file for DaAe_Anc:
 positions <- match(c("DaAe", "Ancestral"), genome.info$name)
-  write_tsv(genome.info[positions,], "plotsr/DaAe_Anc_genomes.txt")
+write_tsv(genome.info[positions,], "plotsr/DaAe_Anc_genomes.txt")
 
 #reverse query and reference for DaAe:
 DaAe.plotsr %>%
@@ -374,7 +374,7 @@ DaAe.plotsr %>%
          q.end=r.end,
          ann) %>%
   arrange(r.chrom, r.start) %>%
-write_tsv("plotsr/DaAe_Ancestral.bedpe", col_names = FALSE)
+  write_tsv("plotsr/DaAe_Ancestral.bedpe", col_names = FALSE)
 ```
 
 For DaAe Coverage on Ancestral, we need to plot Anc_DaAe
@@ -382,7 +382,7 @@ For DaAe Coverage on Ancestral, we need to plot Anc_DaAe
 ```{r}
 #genome file for DaAe_Anc:
 positions <- match(c("Ancestral", "DaAe"), genome.info$name)
-  write_tsv(genome.info[positions,], "plotsr/Anc_DaAe_genomes.txt")
+write_tsv(genome.info[positions,], "plotsr/Anc_DaAe_genomes.txt")
 ```
 
 
@@ -390,9 +390,15 @@ positions <- match(c("Ancestral", "DaAe"), genome.info$name)
 
 ## Create coverage bedgraph files and tracksinfo files.
 ```{r}
-load("Julin_Coverages_and_Positions_median.RData")
+load("Julin_Coverages_and_Positions2_median.RData")
 Clustered_All <- Clustered_All %>%   mutate(Chromosome=str_remove(Chromosome, "chr"),
-                                            Assembly=str_replace(Assembly, "Pseudo_napus", "Ancestral"))
+                                            Assembly=str_replace(Assembly, "Pseudo_napus", "Ancestral")) %>%
+  rowwise() %>%
+  mutate(Consensus=min(Consensus, 3.0)) %>% # truncate duplication levels to keep plot scale reasonable
+  mutate(Start=floor(mean(c(Start,End))),
+         End=Start+1) %>%
+  ungroup() 
+
 unique(Clustered_All$Assembly)
 unique(Clustered_All$Chromosome)
 ```
@@ -405,7 +411,7 @@ for(a in unique(Clustered_All$Assembly)) {
   
   tibble(`#file`=str_c(a, "_cov.bedgraph"), 
          name=str_c("DaAe_coverage_on_", a),
-         tags="ft:bedgraph;bw:10000") %>%
+         tags="ft:bedgraph;bw:20000") %>%
     write_tsv(str_c("plotsr/", a, "_tracks.txt"))
 }
 ```
@@ -419,11 +425,14 @@ if(!(file.exists("/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.
 
 file.copy("plotsr/modified_func.py", "/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py", overwrite = TRUE)
 
+#if we need to bring function from library to repo:
+#file.copy("/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py", "plotsr/modified_func.py", overwrite = TRUE)
+
 #file.copy("plotsr/jm_func.py", "/opt/homebrew/Caskroom/miniconda/base/envs/plotsr/lib/python3.10/site-packages/plotsr/func.py", overwrite = TRUE)
 ```
 
 
-plot those with coverage tracks
+plot with coverage tracks
 ```{bash}
 cd plotsr
 
@@ -433,10 +442,11 @@ source ~/.bash_profile
 
 conda activate plotsr
 
-params_cov="--itx --cfg base.cfg -H 4 -W 12 -S 0.5 "
+params_cov="--itx --cfg base.cfg -H 6 -W 12 -S 0.5"
 
 # plot the comparisons where we have coverage:
-glist="Darmor-Bzh_V10 ZS11"
+glist="Darmor-Bzh_V10 ZS11 GanganF73 No2127 QuintaA Shengli3 Tapidor Westar Zheyou73"
+
 for g in ${glist}
 do
 echo $g
@@ -458,16 +468,16 @@ source ~/.bash_profile
 
 conda activate plotsr
 
-params_cov="--itx --cfg base.cfg -H 4 -W 12 -S 0.5 "
+params_cov="--itx --cfg base.cfg -H 10 -W 10 -S 0.5 "
 
-plotsr --itx \
+plotsr \
 --bp DaAe_Ancestral.bedpe \
 --genomes DaAe_Anc_genomes.txt \
 --tracks DaAe_tracks.txt \
 -o plots/DaAe_Anc_cov.pdf \
 ${params_cov}
 
-plotsr --itx \
+plotsr \
 --bp Ancestral_DaAe.bedpe \
 --genomes Anc_DaAe_genomes.txt \
 --tracks Ancestral_tracks.txt \
@@ -480,27 +490,42 @@ plot those without coverage tracks
 ```{bash}
 cd plotsr
 
-mkdir plots
-
 source ~/.bash_profile
 
 conda activate plotsr
 
-params_cov="--itx --cfg base.cfg -H 4 -W 12 -S 0.75 "
+params_nocov="--itx --cfg base.cfg -H 8 -W 10 -S 0.75 "
 
 # plot the comparisons where we do not have coverage:
-glist="GangfanF73 No2127 QuintaA Shengli3 Tapidor Westar Zheyou73"
+glist="GanganF73 No2127 QuintaA Shengli3 Tapidor Westar Zheyou73"
 for g in ${glist}
 do
 echo $g
-plotsr --itx \
+plotsr \
 --bp ${g}_Ancestral.bedpe \
 --bp Ancestral_DaAe.bedpe \
 --genomes ${g}_Anc_DaAe_genomes.txt \
 -o plots/${g}_Anc_DaAe.pdf \
-${params_cov}
+${params_nocov}
 done
 ```
 
 plot specific regions:
+
+```{bash}
+cd plotsr
+source ~/.bash_profile
+conda activate plotsr
+params_cov="--itx --cfg base.cfg -H 10 -W 10 -S 0.5 "
+
+
+plotsr \
+  --bp ZS11_Ancestral.bedpe \
+  --bp Ancestral_DaAe.bedpe \
+  --genomes ZS11_Anc_DaAe_genomes.txt \
+  --tracks ZS11_tracks.txt \
+  ${params_cov} --chr A01 --chr C01 \
+  -o plots/ZS11_Znc_DaAe_A01_C01.pdf
+```
+
 
