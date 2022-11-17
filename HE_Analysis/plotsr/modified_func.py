@@ -1352,6 +1352,26 @@ def drawax(ax, chrgrps, chrlengths, v, s, cfg, itx, minl=0, maxl=-1, chrname=Non
 
 
 def pltchrom(ax, chrs, chrgrps, chrlengths, v, S, genomes, cfg, itx, minl=0, maxl=-1):
+    CHRDICT = {}
+    CHRDICT['A01'] = '#e6194b'
+    CHRDICT['A02'] = '#3cb44b'
+    CHRDICT['A03'] = '#9e8a06'
+    CHRDICT['A04'] = '#4363d8'
+    CHRDICT['A05'] = '#f58231'
+    CHRDICT['A06'] = '#911eb4'
+    CHRDICT['A07'] = '#46f0f0'
+    CHRDICT['A08'] = '#f032e6'
+    CHRDICT['A09'] = '#bcf60c'
+    CHRDICT['A10'] = '#fabebe'
+    CHRDICT['C01'] = '#008080'
+    CHRDICT['C02'] = '#e6beff'
+    CHRDICT['C03'] = '#9a6324'
+    CHRDICT['C04'] = '#469990'
+    CHRDICT['C05'] = '#800000'
+    CHRDICT['C06'] = '#aaffc3'
+    CHRDICT['C07'] = '#808000'
+    CHRDICT['C08'] = '#ffd8b1'
+    CHRDICT['C09'] = '#000075'
     chrlabs = [False]*len(chrlengths)
     # Set chromosome direction
     pltchr = ax.hlines if not v else ax.vlines
@@ -1376,14 +1396,16 @@ def pltchrom(ax, chrs, chrgrps, chrlengths, v, S, genomes, cfg, itx, minl=0, max
                 genome = [gen for gen in genomes if gen.n == chrlengths[s][0]][0]
                 if not chrlabs[s]:
                     chrlabels.append(pltchr(indents[s]-offset, minl, maxcoord,
-                                            color=genome.lc[i],
+                                            #color=genome.lc[i],
+                                            #color=CHRDICT[chrlabels[i]],
                                             linewidth=genome.lw,
                                             label=chrlengths[s][0],
                                             zorder=2))
                     chrlabs[s] = True
                 else:
                     pltchr(indents[s]-offset, minl, maxcoord,
-                           color=genome.lc[i],
+                           #color=genome.lc[i],
+                           #color=CHRDICT[chrlabels[i]],
                            linewidth=genome.lw,
                            zorder=2)
     elif itx:
@@ -1398,8 +1420,11 @@ def pltchrom(ax, chrs, chrgrps, chrlengths, v, S, genomes, cfg, itx, minl=0, max
                     end = start + chrlengths[s][1][chrgrps[chrs[i]][s]]
                 else:
                     end = start + chrlengths[s][1][chrgrps[chrs[len(chrs)-1-i]][s]]
+                chrcolors = list(chrlengths[s][1].keys())
+                chrcolors.sort()
+                #print(vars(ax))
                 pltchr(fixed, start, end,
-                       color=genome.lc[i],
+                       color=CHRDICT[chrcolors[i]],
                        linewidth=genome.lw,
                        zorder=2)
                 start = end + (MCHR*maxl)
