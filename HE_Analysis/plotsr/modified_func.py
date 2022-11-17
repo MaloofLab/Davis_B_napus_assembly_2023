@@ -42,7 +42,7 @@ MARKERS = {".": "point",
 #VARS = ['SYN', 'INV', 'TRANS', 'INVTR', 'DUP', 'INVDP']
 VARS = ['SYN', 'INV', 'TRANS', 'INVTR', 'DUP', 'INVDP', 'TRANS-A01', 'TRANS-A02', 'TRANS-A03', 'TRANS-A04', 'TRANS-A05', 'TRANS-A06', 'TRANS-A07', 'TRANS-A08', 'TRANS-A09', 'TRANS-A10', 'TRANS-C01', 'TRANS-C02', 'TRANS-C03', 'TRANS-C04', 'TRANS-C05', 'TRANS-C06', 'TRANS-C07', 'TRANS-C08', 'TRANS-C09']
 #COLORS = ['#DEDEDE', '#FFA500', '#9ACD32', '#00BBFF']
-COLORS = ['#DEDEDE', '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075']
+COLORS = ['#DEDEDE', '#e6194b', '#3cb44b', '#9e8a06', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#469990', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075']
 
 FONT_NAMES = []
 for fn in matplotlib.font_manager.findSystemFonts():
@@ -132,7 +132,7 @@ def readbasecfg(f, v):
     cfg['dupcol'] = '#00BBFF'
     cfg['A01'] = '#e6194b'
     cfg['A02'] = '#3cb44b'
-    cfg['A03'] = '#ffe119'
+    cfg['A03'] = '#9e8a06'
     cfg['A04'] = '#4363d8'
     cfg['A05'] = '#f58231'
     cfg['A06'] = '#911eb4'
@@ -143,7 +143,7 @@ def readbasecfg(f, v):
     cfg['C01'] = '#008080'
     cfg['C02'] = '#e6beff'
     cfg['C03'] = '#9a6324'
-    cfg['C04'] = '#fffac8'
+    cfg['C04'] = '#469990'
     cfg['C05'] = '#800000'
     cfg['C06'] = '#aaffc3'
     cfg['C07'] = '#808000'
